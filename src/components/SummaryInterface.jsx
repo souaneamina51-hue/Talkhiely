@@ -8,6 +8,7 @@ const SummaryInterface = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [summary, setSummary] = useState('');
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [summaries, setSummaries] = useState([]);
 
   const {
     status,
@@ -129,6 +130,17 @@ const SummaryInterface = () => {
       setTimeout(() => {
         const simulatedSummary = 'ملخص: النص يتحدث عن أهمية التكنولوجيا والذكاء الاصطناعي في تحسين حياتنا اليومية، خاصة في مجالي العمل والتعليم.';
         setSummary(simulatedSummary);
+        
+        // إضافة الملخص الجديد إلى مصفوفة الملخصات
+        const newSummary = {
+          id: Date.now(),
+          text: simulatedSummary,
+          transcribedText: text,
+          date: new Date(),
+          timestamp: new Date().toLocaleString('ar-SA')
+        };
+        
+        setSummaries(prevSummaries => [...prevSummaries, newSummary]);
         setIsSummarizing(false);
         console.log('الملخص:', simulatedSummary);
       }, 3000);
@@ -155,16 +167,21 @@ const SummaryInterface = () => {
 
   // دالة المشاركة باستخدام Web Share API
   const handleShare = async () => {
-    if (!summary) {
-      alert('لا يوجد ملخص للمشاركة. قم بإنشاء ملخص أولاً.');
+    if (summaries.length === 0) {
+      alert('لا يوجد ملخصات للمشاركة. قم بإنشاء ملخص أولاً.');
       return;
     }
+
+    const allSummariesText = summaries
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .map((summary, index) => `الملخص ${index + 1} (${summary.timestamp}):\n${summary.text}\n\n`)
+      .join('');
 
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'ملخص محاضرة',
-          text: `الملخص الذكي:\n\n${summary}\n\nالنص الكامل:\n\n${transcribedText}`,
+          title: 'ملخصات المحاضرات',
+          text: `جميع الملخصات الذكية:\n\n${allSummariesText}`,
           url: window.location.href
         });
         console.log('تمت المشاركة بنجاح!');
@@ -172,34 +189,39 @@ const SummaryInterface = () => {
         if (error.name !== 'AbortError') {
           console.error('فشل المشاركة:', error);
           // استخدام الطريقة التقليدية في حالة الفشل
-          fallbackShare();
+          fallbackShare(allSummariesText);
         }
       }
     } else {
       console.log('Web Share API غير مدعوم في هذا المتصفح.');
       // استخدام الطريقة التقليدية
-      fallbackShare();
+      fallbackShare(allSummariesText);
     }
   };
 
   // طريقة مشاركة بديلة للمتصفحات التي لا تدعم Web Share API
-  const fallbackShare = () => {
-    const shareText = `الملخص الذكي:\n\n${summary}\n\nالنص الكامل:\n\n${transcribedText}`;
+  const fallbackShare = (shareText = null) => {
+    const textToShare = shareText || (summaries.length > 0 ? 
+      summaries
+        .sort((a, b) => new Date(a.date) - new Date(b.date))
+        .map((summary, index) => `الملخص ${index + 1} (${summary.timestamp}):\n${summary.text}\n\n`)
+        .join('') 
+      : `الملخص الذكي:\n\n${summary}\n\nالنص الكامل:\n\n${transcribedText}`);
     
     // نسخ النص إلى الحافظة
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(shareText).then(() => {
-        alert('تم نسخ الملخص إلى الحافظة! يمكنك لصقه في أي تطبيق آخر.');
+      navigator.clipboard.writeText(textToShare).then(() => {
+        alert('تم نسخ الملخصات إلى الحافظة! يمكنك لصقها في أي تطبيق آخر.');
       }).catch(() => {
         // إنشاء نافذة منبثقة مع النص
         const newWindow = window.open('', '_blank', 'width=600,height=400');
         newWindow.document.write(`
           <html>
-            <head><title>ملخص المحاضرة</title></head>
+            <head><title>ملخصات المحاضرات</title></head>
             <body style="font-family: Arial, sans-serif; padding: 20px; direction: rtl;">
-              <h2>ملخص المحاضرة</h2>
+              <h2>ملخصات المحاضرات</h2>
               <div style="background: #f0f0f0; padding: 15px; border-radius: 5px;">
-                <pre style="white-space: pre-wrap; font-family: inherit;">${shareText}</pre>
+                <pre style="white-space: pre-wrap; font-family: inherit;">${textToShare}</pre>
               </div>
               <p><em>يمكنك نسخ النص أعلاه ومشاركته</em></p>
             </body>
@@ -211,11 +233,11 @@ const SummaryInterface = () => {
       const newWindow = window.open('', '_blank', 'width=600,height=400');
       newWindow.document.write(`
         <html>
-          <head><title>ملخص المحاضرة</title></head>
+          <head><title>ملخصات المحاضرات</title></head>
           <body style="font-family: Arial, sans-serif; padding: 20px; direction: rtl;">
-            <h2>ملخص المحاضرة</h2>
+            <h2>ملخصات المحاضرات</h2>
             <div style="background: #f0f0f0; padding: 15px; border-radius: 5px;">
-              <pre style="white-space: pre-wrap; font-family: inherit;">${shareText}</pre>
+              <pre style="white-space: pre-wrap; font-family: inherit;">${textToShare}</pre>
             </div>
             <p><em>يمكنك نسخ النص أعلاه ومشاركته</em></p>
           </body>
@@ -224,27 +246,38 @@ const SummaryInterface = () => {
     }
   };
 
-  // دالة حفظ الملخص كملف نصي
+  // دالة حفظ جميع الملخصات كملف نصي
   const handleSave = () => {
-    if (!summary) {
-      alert('لا يوجد ملخص للحفظ. قم بإنشاء ملخص أولاً.');
+    if (summaries.length === 0) {
+      alert('لا يوجد ملخصات للحفظ. قم بإنشاء ملخص أولاً.');
       return;
     }
 
+    // ترتيب الملخصات من الأقدم إلى الأحدث
+    const sortedSummaries = summaries.sort((a, b) => new Date(a.date) - new Date(b.date));
+
     // إنشاء النص الكامل للحفظ
-    const fullText = `تطبيق تلخيصلي - ملخص المحاضرة
+    const fullText = `تطبيق تلخيصلي - جميع الملخصات
 ========================================
 
-📝 الملخص الذكي:
-${summary}
+${sortedSummaries.map((summary, index) => `
+📝 الملخص رقم ${index + 1}
+التاريخ والوقت: ${summary.timestamp}
+----------------------------------------
 
-📄 النص الكامل:
-${transcribedText}
+الملخص الذكي:
+${summary.text}
+
+النص الكامل:
+${summary.transcribedText}
 
 ========================================
+`).join('')}
+
 تم إنشاؤه بواسطة تطبيق تلخيصلي
-التاريخ: ${new Date().toLocaleDateString('ar-SA')}
-الوقت: ${new Date().toLocaleTimeString('ar-SA')}`;
+عدد الملخصات: ${summaries.length}
+تاريخ التصدير: ${new Date().toLocaleDateString('ar-SA')}
+وقت التصدير: ${new Date().toLocaleTimeString('ar-SA')}`;
 
     // إنشاء Blob مع النص
     const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
@@ -255,7 +288,7 @@ ${transcribedText}
     // إنشاء عنصر رابط للتنزيل
     const link = document.createElement('a');
     link.href = url;
-    link.download = `ملخص_تلخيصلي_${new Date().toISOString().split('T')[0]}.txt`;
+    link.download = `جميع_الملخصات_تلخيصلي_${new Date().toISOString().split('T')[0]}.txt`;
     
     // إضافة الرابط إلى الصفحة والنقر عليه
     document.body.appendChild(link);
@@ -396,66 +429,133 @@ ${transcribedText}
         </div>
       )}
 
-      {summary && (
-        <div style={{ 
-          marginTop: '30px', 
-          padding: '20px', 
-          backgroundColor: '#e7f3ff', 
-          borderRadius: '8px',
-          textAlign: 'right',
-          direction: 'rtl',
-          border: '2px solid #007bff'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+      {summaries.length > 0 && (
+        <div style={{ marginTop: '30px' }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: '20px',
+            padding: '15px',
+            backgroundColor: '#f8f9fa',
+            borderRadius: '8px'
+          }}>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
                 onClick={handleSave}
                 style={{
-                  padding: '8px 16px',
+                  padding: '10px 18px',
                   backgroundColor: '#17a2b8',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '5px',
-                  fontSize: '14px',
+                  borderRadius: '6px',
+                  fontSize: '16px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '5px'
+                  gap: '8px'
                 }}
-                title="حفظ الملخص كملف"
+                title="حفظ جميع الملخصات كملف"
               >
-                💾 حفظ
+                💾 حفظ الكل
               </button>
               <button
                 onClick={handleShare}
                 style={{
-                  padding: '8px 16px',
+                  padding: '10px 18px',
                   backgroundColor: '#28a745',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '5px',
-                  fontSize: '14px',
+                  borderRadius: '6px',
+                  fontSize: '16px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '5px'
+                  gap: '8px'
                 }}
-                title="مشاركة الملخص"
+                title="مشاركة جميع الملخصات"
               >
-                📤 مشاركة
+                📤 مشاركة الكل
               </button>
             </div>
-            <h3 style={{ color: '#007bff', margin: '0' }}>📝 الملخص الذكي:</h3>
+            <h2 style={{ color: '#333', margin: '0' }}>📚 جميع الملخصات ({summaries.length})</h2>
           </div>
-          <p style={{ 
-            fontSize: '16px', 
-            lineHeight: '1.6', 
-            color: '#333',
-            margin: '0',
-            fontWeight: 'bold'
-          }}>
-            {summary}
-          </p>
+          
+          {summaries
+            .sort((a, b) => new Date(a.date) - new Date(b.date))
+            .map((summaryItem, index) => (
+              <div 
+                key={summaryItem.id}
+                style={{ 
+                  marginBottom: '25px', 
+                  padding: '20px', 
+                  backgroundColor: '#e7f3ff', 
+                  borderRadius: '8px',
+                  textAlign: 'right',
+                  direction: 'rtl',
+                  border: '2px solid #007bff'
+                }}
+              >
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  marginBottom: '15px' 
+                }}>
+                  <small style={{ color: '#666', fontSize: '14px' }}>
+                    {summaryItem.timestamp}
+                  </small>
+                  <h3 style={{ color: '#007bff', margin: '0' }}>
+                    📝 الملخص رقم {index + 1}
+                  </h3>
+                </div>
+                <div style={{ 
+                  backgroundColor: 'white', 
+                  padding: '15px', 
+                  borderRadius: '6px',
+                  marginBottom: '15px'
+                }}>
+                  <h4 style={{ color: '#007bff', marginTop: '0', marginBottom: '10px' }}>
+                    الملخص الذكي:
+                  </h4>
+                  <p style={{ 
+                    fontSize: '16px', 
+                    lineHeight: '1.6', 
+                    color: '#333',
+                    margin: '0',
+                    fontWeight: 'bold'
+                  }}>
+                    {summaryItem.text}
+                  </p>
+                </div>
+                <details>
+                  <summary style={{ 
+                    cursor: 'pointer', 
+                    color: '#666', 
+                    fontSize: '14px',
+                    marginBottom: '10px'
+                  }}>
+                    عرض النص الكامل
+                  </summary>
+                  <div style={{ 
+                    backgroundColor: '#f8f9fa', 
+                    padding: '15px', 
+                    borderRadius: '6px',
+                    marginTop: '10px'
+                  }}>
+                    <p style={{ 
+                      fontSize: '14px', 
+                      lineHeight: '1.6', 
+                      color: '#555',
+                      margin: '0'
+                    }}>
+                      {summaryItem.transcribedText}
+                    </p>
+                  </div>
+                </details>
+              </div>
+            ))
+          }
         </div>
       )}
     </div>
