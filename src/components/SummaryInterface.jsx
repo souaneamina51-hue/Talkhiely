@@ -32,10 +32,45 @@ const SummaryInterface = () => {
     startRecording();
   };
 
-  const handleStop = () => {
+  const handleStop = async () => {
     setIsActive(false);
     stopRecording();
   };
+
+  // دالة لإرسال الصوت إلى API
+  const sendAudioToAPI = async (audioBlob) => {
+    try {
+      // تحويل mediaBlobUrl إلى كائن Blob
+      const response = await fetch(mediaBlobUrl);
+      const audioBlob = await response.blob();
+      
+      // إنشاء كائن FormData وإضافة ملف الصوت إليه
+      const formData = new FormData();
+      formData.append('audio_file', audioBlob, 'recording.wav');
+      
+      // إرسال طلب POST إلى API
+      const apiResponse = await fetch('https://api.example.com/speech-to-text', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (apiResponse.ok) {
+        const result = await apiResponse.json();
+        console.log('النص المستخرج:', result.text || result);
+      } else {
+        console.error('خطأ في إرسال الطلب:', apiResponse.status);
+      }
+    } catch (error) {
+      console.error('خطأ في إرسال الصوت إلى API:', error);
+    }
+  };
+
+  // استدعاء sendAudioToAPI عندما يكون mediaBlobUrl متاحاً
+  useEffect(() => {
+    if (mediaBlobUrl && status === 'stopped') {
+      sendAudioToAPI();
+    }
+  }, [mediaBlobUrl, status]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
