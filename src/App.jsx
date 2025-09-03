@@ -1,9 +1,11 @@
 import React from 'react';
-import SummaryInterface from './components/SummaryInterface';
+import SummaryInterface from './components/SummaryInterface.jsx';
 
 const App = () => {
   return (
-    <SummaryInterface />
+    <div>
+      <SummaryInterface />
+    </div>
   );
 };
 
