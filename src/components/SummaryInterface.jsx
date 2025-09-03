@@ -153,6 +153,77 @@ const SummaryInterface = () => {
     }
   };
 
+  // دالة المشاركة باستخدام Web Share API
+  const handleShare = async () => {
+    if (!summary) {
+      alert('لا يوجد ملخص للمشاركة. قم بإنشاء ملخص أولاً.');
+      return;
+    }
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'ملخص محاضرة',
+          text: `الملخص الذكي:\n\n${summary}\n\nالنص الكامل:\n\n${transcribedText}`,
+          url: window.location.href
+        });
+        console.log('تمت المشاركة بنجاح!');
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.error('فشل المشاركة:', error);
+          // استخدام الطريقة التقليدية في حالة الفشل
+          fallbackShare();
+        }
+      }
+    } else {
+      console.log('Web Share API غير مدعوم في هذا المتصفح.');
+      // استخدام الطريقة التقليدية
+      fallbackShare();
+    }
+  };
+
+  // طريقة مشاركة بديلة للمتصفحات التي لا تدعم Web Share API
+  const fallbackShare = () => {
+    const shareText = `الملخص الذكي:\n\n${summary}\n\nالنص الكامل:\n\n${transcribedText}`;
+    
+    // نسخ النص إلى الحافظة
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(shareText).then(() => {
+        alert('تم نسخ الملخص إلى الحافظة! يمكنك لصقه في أي تطبيق آخر.');
+      }).catch(() => {
+        // إنشاء نافذة منبثقة مع النص
+        const newWindow = window.open('', '_blank', 'width=600,height=400');
+        newWindow.document.write(`
+          <html>
+            <head><title>ملخص المحاضرة</title></head>
+            <body style="font-family: Arial, sans-serif; padding: 20px; direction: rtl;">
+              <h2>ملخص المحاضرة</h2>
+              <div style="background: #f0f0f0; padding: 15px; border-radius: 5px;">
+                <pre style="white-space: pre-wrap; font-family: inherit;">${shareText}</pre>
+              </div>
+              <p><em>يمكنك نسخ النص أعلاه ومشاركته</em></p>
+            </body>
+          </html>
+        `);
+      });
+    } else {
+      // إنشاء نافذة منبثقة مع النص
+      const newWindow = window.open('', '_blank', 'width=600,height=400');
+      newWindow.document.write(`
+        <html>
+          <head><title>ملخص المحاضرة</title></head>
+          <body style="font-family: Arial, sans-serif; padding: 20px; direction: rtl;">
+            <h2>ملخص المحاضرة</h2>
+            <div style="background: #f0f0f0; padding: 15px; border-radius: 5px;">
+              <pre style="white-space: pre-wrap; font-family: inherit;">${shareText}</pre>
+            </div>
+            <p><em>يمكنك نسخ النص أعلاه ومشاركته</em></p>
+          </body>
+        </html>
+      `);
+    }
+  };
+
   // استدعاء sendAudioToAPI عندما يكون mediaBlobUrl متاحاً
   useEffect(() => {
     if (mediaBlobUrl && status === 'stopped') {
@@ -291,7 +362,27 @@ const SummaryInterface = () => {
           direction: 'rtl',
           border: '2px solid #007bff'
         }}>
-          <h3 style={{ color: '#007bff', marginBottom: '15px' }}>📝 الملخص الذكي:</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <button
+              onClick={handleShare}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#28a745',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                fontSize: '14px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+              title="مشاركة الملخص"
+            >
+              📤 مشاركة
+            </button>
+            <h3 style={{ color: '#007bff', margin: '0' }}>📝 الملخص الذكي:</h3>
+          </div>
           <p style={{ 
             fontSize: '16px', 
             lineHeight: '1.6', 
