@@ -1,5 +1,31 @@
+
 import React, { useState, useEffect } from 'react';
 import { useReactMediaRecorder } from 'react-media-recorder';
+import {
+  Box,
+  Button,
+  Heading,
+  Text,
+  VStack,
+  HStack,
+  Container,
+  Card,
+  CardBody,
+  CardHeader,
+  Badge,
+  Progress,
+  Alert,
+  AlertIcon,
+  Divider,
+  Accordion,
+  AccordionItem,
+  AccordionButton,
+  AccordionPanel,
+  AccordionIcon,
+  Flex,
+  Spacer,
+  useColorModeValue
+} from '@chakra-ui/react';
 
 const SummaryInterface = () => {
   const [timer, setTimer] = useState(0);
@@ -17,6 +43,9 @@ const SummaryInterface = () => {
     mediaBlobUrl,
   } = useReactMediaRecorder({ audio: true });
 
+  const cardBg = useColorModeValue('white', 'gray.800');
+  const mainBg = useColorModeValue('gray.50', 'gray.900');
+
   // Timer functionality
   useEffect(() => {
     let interval = null;
@@ -33,8 +62,8 @@ const SummaryInterface = () => {
   const handleStart = () => {
     setIsActive(true);
     setTimer(0);
-    setTranscribedText(''); // مسح النص السابق
-    setSummary(''); // مسح الملخص السابق
+    setTranscribedText('');
+    setSummary('');
     startRecording();
   };
 
@@ -43,49 +72,25 @@ const SummaryInterface = () => {
     stopRecording();
   };
 
-  // دالة لإرسال الصوت إلى API
   const sendAudioToAPI = async () => {
     if (!mediaBlobUrl) return;
     
     setIsProcessing(true);
     try {
-      // تحويل mediaBlobUrl إلى كائن Blob
       const response = await fetch(mediaBlobUrl);
       const audioBlob = await response.blob();
       
-      // إنشاء كائن FormData وإضافة ملف الصوت إليه
       const formData = new FormData();
       formData.append('audio_file', audioBlob, 'recording.wav');
       
-      // محاكاة استجابة API (استبدل هذا بـ API حقيقي)
-      // const apiResponse = await fetch('https://api.example.com/speech-to-text', {
-      //   method: 'POST',
-      //   body: formData,
-      // });
-      
-      // محاكاة نص مستخرج للعرض (يمكن استبداله بـ API حقيقي)
       setTimeout(async () => {
         const simulatedText = 'هذا نص تجريبي يمثل النص المستخرج من التسجيل الصوتي. يتحدث عن أهمية التكنولوجيا في حياتنا اليومية وكيف يمكن للذكاء الاصطناعي أن يساعد في تحسين العديد من جوانب العمل والتعليم. كما يذكر النص فوائد استخدام التطبيقات الذكية في تسهيل المهام المختلفة.';
         setTranscribedText(simulatedText);
         setIsProcessing(false);
         console.log('النص المستخرج:', simulatedText);
         
-        // بدء عملية التلخيص تلقائياً
         await summarizeText(simulatedText);
       }, 2000);
-      
-      // كود API الحقيقي (معلق للآن):
-      /*
-      if (apiResponse.ok) {
-        const result = await apiResponse.json();
-        const extractedText = result.text || result.transcription || 'لم يتم العثور على نص';
-        setTranscribedText(extractedText);
-        console.log('النص المستخرج:', extractedText);
-      } else {
-        console.error('خطأ في إرسال الطلب:', apiResponse.status);
-        setTranscribedText('خطأ في معالجة الصوت. حاول مرة أخرى.');
-      }
-      */
       
     } catch (error) {
       console.error('خطأ في إرسال الصوت إلى API:', error);
@@ -94,44 +99,21 @@ const SummaryInterface = () => {
     }
   };
 
-  // دالة لتلخيص النص باستخدام AI
   const summarizeText = async (text) => {
     if (!text) return;
     
     setIsSummarizing(true);
     try {
-      // تحضير البيانات كـ JSON بدلاً من FormData
       const requestData = {
         text: text,
         max_length: 100,
         min_length: 30
       };
       
-      // إرسال طلب POST إلى API التلخيص
-      // const apiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //     'Authorization': 'Bearer YOUR_API_KEY'
-      //   },
-      //   body: JSON.stringify({
-      //     model: "gpt-3.5-turbo",
-      //     messages: [
-      //       {
-      //         role: "user",
-      //         content: `لخص النص التالي في جملتين أو ثلاث جمل: ${text}`
-      //       }
-      //     ],
-      //     max_tokens: 150
-      //   })
-      // });
-      
-      // محاكاة استجابة API للتلخيص
       setTimeout(() => {
         const simulatedSummary = 'ملخص: النص يتحدث عن أهمية التكنولوجيا والذكاء الاصطناعي في تحسين حياتنا اليومية، خاصة في مجالي العمل والتعليم.';
         setSummary(simulatedSummary);
         
-        // إضافة الملخص الجديد إلى مصفوفة الملخصات
         const newSummary = {
           id: Date.now(),
           text: simulatedSummary,
@@ -145,19 +127,6 @@ const SummaryInterface = () => {
         console.log('الملخص:', simulatedSummary);
       }, 3000);
       
-      // كود API الحقيقي للتلخيص (معلق للآن):
-      /*
-      if (apiResponse.ok) {
-        const result = await apiResponse.json();
-        const generatedSummary = result.choices[0].message.content || 'لم يتم إنتاج ملخص';
-        setSummary(generatedSummary);
-        console.log('الملخص:', generatedSummary);
-      } else {
-        console.error('خطأ في تلخيص النص:', apiResponse.status);
-        setSummary('خطأ في معالجة التلخيص. حاول مرة أخرى.');
-      }
-      */
-      
     } catch (error) {
       console.error('خطأ في تلخيص النص:', error);
       setSummary('خطأ في الاتصال بخدمة التلخيص.');
@@ -165,7 +134,6 @@ const SummaryInterface = () => {
     }
   };
 
-  // دالة المشاركة باستخدام Web Share API
   const handleShare = async () => {
     if (summaries.length === 0) {
       alert('لا يوجد ملخصات للمشاركة. قم بإنشاء ملخص أولاً.');
@@ -188,18 +156,15 @@ const SummaryInterface = () => {
       } catch (error) {
         if (error.name !== 'AbortError') {
           console.error('فشل المشاركة:', error);
-          // استخدام الطريقة التقليدية في حالة الفشل
           fallbackShare(allSummariesText);
         }
       }
     } else {
       console.log('Web Share API غير مدعوم في هذا المتصفح.');
-      // استخدام الطريقة التقليدية
       fallbackShare(allSummariesText);
     }
   };
 
-  // طريقة مشاركة بديلة للمتصفحات التي لا تدعم Web Share API
   const fallbackShare = (shareText = null) => {
     const textToShare = shareText || (summaries.length > 0 ? 
       summaries
@@ -208,12 +173,10 @@ const SummaryInterface = () => {
         .join('') 
       : `الملخص الذكي:\n\n${summary}\n\nالنص الكامل:\n\n${transcribedText}`);
     
-    // نسخ النص إلى الحافظة
     if (navigator.clipboard) {
       navigator.clipboard.writeText(textToShare).then(() => {
         alert('تم نسخ الملخصات إلى الحافظة! يمكنك لصقها في أي تطبيق آخر.');
       }).catch(() => {
-        // إنشاء نافذة منبثقة مع النص
         const newWindow = window.open('', '_blank', 'width=600,height=400');
         newWindow.document.write(`
           <html>
@@ -229,7 +192,6 @@ const SummaryInterface = () => {
         `);
       });
     } else {
-      // إنشاء نافذة منبثقة مع النص
       const newWindow = window.open('', '_blank', 'width=600,height=400');
       newWindow.document.write(`
         <html>
@@ -246,17 +208,14 @@ const SummaryInterface = () => {
     }
   };
 
-  // دالة حفظ جميع الملخصات كملف نصي
   const handleSave = () => {
     if (summaries.length === 0) {
       alert('لا يوجد ملخصات للحفظ. قم بإنشاء ملخص أولاً.');
       return;
     }
 
-    // ترتيب الملخصات من الأقدم إلى الأحدث
     const sortedSummaries = summaries.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    // إنشاء النص الكامل للحفظ
     const fullText = `تطبيق تلخيصلي - جميع الملخصات
 ========================================
 
@@ -279,29 +238,20 @@ ${summary.transcribedText}
 تاريخ التصدير: ${new Date().toLocaleDateString('ar-SA')}
 وقت التصدير: ${new Date().toLocaleTimeString('ar-SA')}`;
 
-    // إنشاء Blob مع النص
     const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
-    
-    // إنشاء رابط مؤقت
     const url = URL.createObjectURL(blob);
-    
-    // إنشاء عنصر رابط للتنزيل
     const link = document.createElement('a');
     link.href = url;
     link.download = `جميع_الملخصات_تلخيصلي_${new Date().toISOString().split('T')[0]}.txt`;
     
-    // إضافة الرابط إلى الصفحة والنقر عليه
     document.body.appendChild(link);
     link.click();
-    
-    // تنظيف: إزالة الرابط وتحرير الذاكرة
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
     
     console.log('تم حفظ الملف بنجاح!');
   };
 
-  // استدعاء sendAudioToAPI عندما يكون mediaBlobUrl متاحاً
   useEffect(() => {
     if (mediaBlobUrl && status === 'stopped') {
       sendAudioToAPI();
@@ -330,235 +280,261 @@ ${summary.transcribedText}
     }
   };
 
+  const getStatusColor = () => {
+    if (status === 'recording') return 'red';
+    if (isProcessing) return 'orange';
+    return 'blue';
+  };
+
   return (
-    <div style={{ textAlign: 'center', padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
-      <h1>واجهة التلخيص</h1>
-      <p style={{ fontSize: '24px', margin: '20px 0' }}>{formatTime(timer)}</p>
-      <p style={{ 
-        fontSize: '16px', 
-        margin: '10px 0', 
-        color: status === 'recording' ? 'red' : isProcessing ? 'orange' : 'black' 
-      }}>
-        {getStatusText()}
-      </p>
-      
-      <div style={{ margin: '20px 0' }}>
-        <button 
-          onClick={handleStart} 
-          disabled={status === 'recording' || isProcessing || isSummarizing}
-          style={{ 
-            margin: '0 10px', 
-            padding: '10px 20px',
-            fontSize: '16px',
-            backgroundColor: (status === 'recording' || isProcessing || isSummarizing) ? '#ccc' : '#4CAF50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: (status === 'recording' || isProcessing || isSummarizing) ? 'not-allowed' : 'pointer'
-          }}
-        >
-          ابدأ
-        </button>
-        <button 
-          onClick={handleStop} 
-          disabled={status !== 'recording'}
-          style={{ 
-            margin: '0 10px', 
-            padding: '10px 20px',
-            fontSize: '16px',
-            backgroundColor: status !== 'recording' ? '#ccc' : '#f44336',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: status !== 'recording' ? 'not-allowed' : 'pointer'
-          }}
-        >
-          إيقاف
-        </button>
-      </div>
+    <Box bg={mainBg} minH="100vh" py={8}>
+      <Container maxW="4xl">
+        <VStack spacing={8}>
+          {/* Header */}
+          <Card w="full" bg={cardBg} shadow="lg">
+            <CardBody textAlign="center">
+              <Heading as="h1" size="xl" mb={4} color="blue.600">
+                🎤 واجهة التلخيص الذكي
+              </Heading>
+              
+              {/* Timer Display */}
+              <Box mb={4}>
+                <Text fontSize="3xl" fontWeight="bold" color="gray.600">
+                  {formatTime(timer)}
+                </Text>
+                <Badge 
+                  colorScheme={getStatusColor()} 
+                  variant="solid" 
+                  fontSize="md" 
+                  px={3} 
+                  py={1}
+                  borderRadius="full"
+                >
+                  {getStatusText()}
+                </Badge>
+              </Box>
 
-      {mediaBlobUrl && (
-        <div style={{ marginTop: '20px' }}>
-          <p>التسجيل المكتمل:</p>
-          <audio src={mediaBlobUrl} controls style={{ width: '100%', maxWidth: '400px' }} />
-        </div>
-      )}
+              {/* Control Buttons */}
+              <HStack spacing={4} justify="center">
+                <Button
+                  onClick={handleStart}
+                  isDisabled={status === 'recording' || isProcessing || isSummarizing}
+                  colorScheme="green"
+                  size="lg"
+                  leftIcon={<Text>▶️</Text>}
+                  isLoading={status === 'recording'}
+                  loadingText="جاري التسجيل..."
+                >
+                  ابدأ التسجيل
+                </Button>
+                
+                <Button
+                  onClick={handleStop}
+                  isDisabled={status !== 'recording'}
+                  colorScheme="red"
+                  size="lg"
+                  leftIcon={<Text>⏹️</Text>}
+                >
+                  إيقاف التسجيل
+                </Button>
+              </HStack>
+            </CardBody>
+          </Card>
 
-      {transcribedText && (
-        <div style={{ 
-          marginTop: '30px', 
-          padding: '20px', 
-          backgroundColor: '#f0f0f0', 
-          borderRadius: '8px',
-          textAlign: 'right',
-          direction: 'rtl'
-        }}>
-          <h3 style={{ color: '#333', marginBottom: '15px' }}>النص المستخرج:</h3>
-          <p style={{ 
-            fontSize: '16px', 
-            lineHeight: '1.6', 
-            color: '#555',
-            margin: '0'
-          }}>
-            {transcribedText}
-          </p>
-        </div>
-      )}
+          {/* Audio Player */}
+          {mediaBlobUrl && (
+            <Card w="full" bg={cardBg} shadow="md">
+              <CardBody textAlign="center">
+                <Text mb={3} fontSize="lg" fontWeight="semibold">
+                  🎵 التسجيل المكتمل
+                </Text>
+                <Box 
+                  as="audio" 
+                  src={mediaBlobUrl} 
+                  controls 
+                  w="full" 
+                  maxW="500px"
+                  mx="auto"
+                />
+              </CardBody>
+            </Card>
+          )}
 
-      {isProcessing && (
-        <div style={{ 
-          marginTop: '20px',
-          padding: '15px',
-          backgroundColor: '#fff3cd',
-          borderRadius: '5px',
-          color: '#856404'
-        }}>
-          🔄 جاري تحويل الصوت إلى نص...
-        </div>
-      )}
+          {/* Processing Alerts */}
+          {isProcessing && (
+            <Alert status="warning" borderRadius="lg">
+              <AlertIcon />
+              <VStack align="start" spacing={2} w="full">
+                <Text fontWeight="bold">🔄 جاري تحويل الصوت إلى نص...</Text>
+                <Progress size="sm" isIndeterminate colorScheme="orange" w="full" />
+              </VStack>
+            </Alert>
+          )}
 
-      {isSummarizing && (
-        <div style={{ 
-          marginTop: '20px',
-          padding: '15px',
-          backgroundColor: '#d1ecf1',
-          borderRadius: '5px',
-          color: '#0c5460'
-        }}>
-          🤖 جاري تلخيص النص باستخدام الذكاء الاصطناعي...
-        </div>
-      )}
+          {isSummarizing && (
+            <Alert status="info" borderRadius="lg">
+              <AlertIcon />
+              <VStack align="start" spacing={2} w="full">
+                <Text fontWeight="bold">🤖 جاري تلخيص النص باستخدام الذكاء الاصطناعي...</Text>
+                <Progress size="sm" isIndeterminate colorScheme="blue" w="full" />
+              </VStack>
+            </Alert>
+          )}
 
-      {summaries.length > 0 && (
-        <div style={{ marginTop: '30px' }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            marginBottom: '20px',
-            padding: '15px',
-            backgroundColor: '#f8f9fa',
-            borderRadius: '8px'
-          }}>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                onClick={handleSave}
-                style={{
-                  padding: '10px 18px',
-                  backgroundColor: '#17a2b8',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '16px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-                title="حفظ جميع الملخصات كملف"
-              >
-                💾 حفظ الكل
-              </button>
-              <button
-                onClick={handleShare}
-                style={{
-                  padding: '10px 18px',
-                  backgroundColor: '#28a745',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '16px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-                title="مشاركة جميع الملخصات"
-              >
-                📤 مشاركة الكل
-              </button>
-            </div>
-            <h2 style={{ color: '#333', margin: '0' }}>📚 جميع الملخصات ({summaries.length})</h2>
-          </div>
-          
-          {summaries
-            .sort((a, b) => new Date(a.date) - new Date(b.date))
-            .map((summaryItem, index) => (
-              <div 
-                key={summaryItem.id}
-                style={{ 
-                  marginBottom: '25px', 
-                  padding: '20px', 
-                  backgroundColor: '#e7f3ff', 
-                  borderRadius: '8px',
-                  textAlign: 'right',
-                  direction: 'rtl',
-                  border: '2px solid #007bff'
-                }}
-              >
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center', 
-                  marginBottom: '15px' 
-                }}>
-                  <small style={{ color: '#666', fontSize: '14px' }}>
-                    {summaryItem.timestamp}
-                  </small>
-                  <h3 style={{ color: '#007bff', margin: '0' }}>
-                    📝 الملخص رقم {index + 1}
-                  </h3>
-                </div>
-                <div style={{ 
-                  backgroundColor: 'white', 
-                  padding: '15px', 
-                  borderRadius: '6px',
-                  marginBottom: '15px'
-                }}>
-                  <h4 style={{ color: '#007bff', marginTop: '0', marginBottom: '10px' }}>
-                    الملخص الذكي:
-                  </h4>
-                  <p style={{ 
-                    fontSize: '16px', 
-                    lineHeight: '1.6', 
-                    color: '#333',
-                    margin: '0',
-                    fontWeight: 'bold'
-                  }}>
-                    {summaryItem.text}
-                  </p>
-                </div>
-                <details>
-                  <summary style={{ 
-                    cursor: 'pointer', 
-                    color: '#666', 
-                    fontSize: '14px',
-                    marginBottom: '10px'
-                  }}>
-                    عرض النص الكامل
-                  </summary>
-                  <div style={{ 
-                    backgroundColor: '#f8f9fa', 
-                    padding: '15px', 
-                    borderRadius: '6px',
-                    marginTop: '10px'
-                  }}>
-                    <p style={{ 
-                      fontSize: '14px', 
-                      lineHeight: '1.6', 
-                      color: '#555',
-                      margin: '0'
-                    }}>
-                      {summaryItem.transcribedText}
-                    </p>
-                  </div>
-                </details>
-              </div>
-            ))
-          }
-        </div>
-      )}
-    </div>
+          {/* Transcribed Text */}
+          {transcribedText && (
+            <Card w="full" bg={cardBg} shadow="md">
+              <CardHeader>
+                <Heading size="md" color="green.600">
+                  📝 النص المستخرج
+                </Heading>
+              </CardHeader>
+              <CardBody>
+                <Text 
+                  fontSize="lg" 
+                  lineHeight="tall" 
+                  textAlign="right" 
+                  dir="rtl"
+                  p={4}
+                  bg="gray.50"
+                  borderRadius="md"
+                >
+                  {transcribedText}
+                </Text>
+              </CardBody>
+            </Card>
+          )}
+
+          {/* All Summaries */}
+          {summaries.length > 0 && (
+            <Card w="full" bg={cardBg} shadow="lg">
+              <CardHeader>
+                <Flex align="center">
+                  <Heading size="lg" color="blue.600">
+                    📚 جميع الملخصات ({summaries.length})
+                  </Heading>
+                  <Spacer />
+                  <HStack spacing={3}>
+                    <Button
+                      onClick={handleSave}
+                      colorScheme="cyan"
+                      leftIcon={<Text>💾</Text>}
+                      size="md"
+                    >
+                      حفظ الكل
+                    </Button>
+                    <Button
+                      onClick={handleShare}
+                      colorScheme="green"
+                      leftIcon={<Text>📤</Text>}
+                      size="md"
+                    >
+                      مشاركة الكل
+                    </Button>
+                  </HStack>
+                </Flex>
+              </CardHeader>
+              
+              <CardBody>
+                <VStack spacing={6}>
+                  {summaries
+                    .sort((a, b) => new Date(a.date) - new Date(b.date))
+                    .map((summaryItem, index) => (
+                      <Card 
+                        key={summaryItem.id}
+                        w="full" 
+                        bg="blue.50" 
+                        border="2px solid" 
+                        borderColor="blue.200"
+                        shadow="sm"
+                      >
+                        <CardHeader>
+                          <Flex align="center" justify="space-between">
+                            <Heading size="md" color="blue.700">
+                              📝 الملخص رقم {index + 1}
+                            </Heading>
+                            <Badge colorScheme="blue" variant="outline">
+                              {summaryItem.timestamp}
+                            </Badge>
+                          </Flex>
+                        </CardHeader>
+                        
+                        <CardBody>
+                          <VStack spacing={4} align="stretch">
+                            {/* Summary */}
+                            <Box>
+                              <Text fontSize="sm" color="blue.600" fontWeight="semibold" mb={2}>
+                                الملخص الذكي:
+                              </Text>
+                              <Box 
+                                bg="white" 
+                                p={4} 
+                                borderRadius="md" 
+                                border="1px solid" 
+                                borderColor="blue.100"
+                              >
+                                <Text 
+                                  fontSize="lg" 
+                                  fontWeight="bold" 
+                                  textAlign="right" 
+                                  dir="rtl"
+                                  color="gray.700"
+                                >
+                                  {summaryItem.text}
+                                </Text>
+                              </Box>
+                            </Box>
+
+                            <Divider />
+
+                            {/* Full Text Accordion */}
+                            <Accordion allowToggle>
+                              <AccordionItem border="none">
+                                <AccordionButton 
+                                  px={0} 
+                                  _hover={{ bg: "transparent" }}
+                                  _expanded={{ color: "blue.600" }}
+                                >
+                                  <Box flex="1" textAlign="right">
+                                    <Text fontSize="sm" color="gray.600">
+                                      عرض النص الكامل
+                                    </Text>
+                                  </Box>
+                                  <AccordionIcon />
+                                </AccordionButton>
+                                <AccordionPanel px={0} pt={3}>
+                                  <Box 
+                                    bg="gray.50" 
+                                    p={4} 
+                                    borderRadius="md"
+                                    border="1px solid" 
+                                    borderColor="gray.200"
+                                  >
+                                    <Text 
+                                      fontSize="md" 
+                                      lineHeight="tall" 
+                                      textAlign="right" 
+                                      dir="rtl"
+                                      color="gray.600"
+                                    >
+                                      {summaryItem.transcribedText}
+                                    </Text>
+                                  </Box>
+                                </AccordionPanel>
+                              </AccordionItem>
+                            </Accordion>
+                          </VStack>
+                        </CardBody>
+                      </Card>
+                    ))
+                  }
+                </VStack>
+              </CardBody>
+            </Card>
+          )}
+        </VStack>
+      </Container>
+    </Box>
   );
 };
 
