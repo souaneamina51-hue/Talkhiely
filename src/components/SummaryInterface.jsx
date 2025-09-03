@@ -6,6 +6,8 @@ const SummaryInterface = () => {
   const [isActive, setIsActive] = useState(false);
   const [transcribedText, setTranscribedText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [summary, setSummary] = useState('');
+  const [isSummarizing, setIsSummarizing] = useState(false);
 
   const {
     status,
@@ -31,6 +33,7 @@ const SummaryInterface = () => {
     setIsActive(true);
     setTimer(0);
     setTranscribedText(''); // مسح النص السابق
+    setSummary(''); // مسح الملخص السابق
     startRecording();
   };
 
@@ -60,11 +63,14 @@ const SummaryInterface = () => {
       // });
       
       // محاكاة نص مستخرج للعرض (يمكن استبداله بـ API حقيقي)
-      setTimeout(() => {
-        const simulatedText = 'هذا نص تجريبي يمثل النص المستخرج من التسجيل الصوتي. يمكنك استبدال هذا بـ API حقيقي لتحويل الكلام إلى نص.';
+      setTimeout(async () => {
+        const simulatedText = 'هذا نص تجريبي يمثل النص المستخرج من التسجيل الصوتي. يتحدث عن أهمية التكنولوجيا في حياتنا اليومية وكيف يمكن للذكاء الاصطناعي أن يساعد في تحسين العديد من جوانب العمل والتعليم. كما يذكر النص فوائد استخدام التطبيقات الذكية في تسهيل المهام المختلفة.';
         setTranscribedText(simulatedText);
         setIsProcessing(false);
         console.log('النص المستخرج:', simulatedText);
+        
+        // بدء عملية التلخيص تلقائياً
+        await summarizeText(simulatedText);
       }, 2000);
       
       // كود API الحقيقي (معلق للآن):
@@ -87,6 +93,66 @@ const SummaryInterface = () => {
     }
   };
 
+  // دالة لتلخيص النص باستخدام AI
+  const summarizeText = async (text) => {
+    if (!text) return;
+    
+    setIsSummarizing(true);
+    try {
+      // تحضير البيانات كـ JSON بدلاً من FormData
+      const requestData = {
+        text: text,
+        max_length: 100,
+        min_length: 30
+      };
+      
+      // إرسال طلب POST إلى API التلخيص
+      // const apiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //     'Authorization': 'Bearer YOUR_API_KEY'
+      //   },
+      //   body: JSON.stringify({
+      //     model: "gpt-3.5-turbo",
+      //     messages: [
+      //       {
+      //         role: "user",
+      //         content: `لخص النص التالي في جملتين أو ثلاث جمل: ${text}`
+      //       }
+      //     ],
+      //     max_tokens: 150
+      //   })
+      // });
+      
+      // محاكاة استجابة API للتلخيص
+      setTimeout(() => {
+        const simulatedSummary = 'ملخص: النص يتحدث عن أهمية التكنولوجيا والذكاء الاصطناعي في تحسين حياتنا اليومية، خاصة في مجالي العمل والتعليم.';
+        setSummary(simulatedSummary);
+        setIsSummarizing(false);
+        console.log('الملخص:', simulatedSummary);
+      }, 3000);
+      
+      // كود API الحقيقي للتلخيص (معلق للآن):
+      /*
+      if (apiResponse.ok) {
+        const result = await apiResponse.json();
+        const generatedSummary = result.choices[0].message.content || 'لم يتم إنتاج ملخص';
+        setSummary(generatedSummary);
+        console.log('الملخص:', generatedSummary);
+      } else {
+        console.error('خطأ في تلخيص النص:', apiResponse.status);
+        setSummary('خطأ في معالجة التلخيص. حاول مرة أخرى.');
+      }
+      */
+      
+    } catch (error) {
+      console.error('خطأ في تلخيص النص:', error);
+      setSummary('خطأ في الاتصال بخدمة التلخيص.');
+      setIsSummarizing(false);
+    }
+  };
+
   // استدعاء sendAudioToAPI عندما يكون mediaBlobUrl متاحاً
   useEffect(() => {
     if (mediaBlobUrl && status === 'stopped') {
@@ -102,6 +168,7 @@ const SummaryInterface = () => {
 
   const getStatusText = () => {
     if (isProcessing) return 'جاري معالجة الصوت...';
+    if (isSummarizing) return 'جاري تلخيص النص...';
     
     switch (status) {
       case 'recording':
@@ -130,16 +197,16 @@ const SummaryInterface = () => {
       <div style={{ margin: '20px 0' }}>
         <button 
           onClick={handleStart} 
-          disabled={status === 'recording' || isProcessing}
+          disabled={status === 'recording' || isProcessing || isSummarizing}
           style={{ 
             margin: '0 10px', 
             padding: '10px 20px',
             fontSize: '16px',
-            backgroundColor: (status === 'recording' || isProcessing) ? '#ccc' : '#4CAF50',
+            backgroundColor: (status === 'recording' || isProcessing || isSummarizing) ? '#ccc' : '#4CAF50',
             color: 'white',
             border: 'none',
             borderRadius: '5px',
-            cursor: (status === 'recording' || isProcessing) ? 'not-allowed' : 'pointer'
+            cursor: (status === 'recording' || isProcessing || isSummarizing) ? 'not-allowed' : 'pointer'
           }}
         >
           ابدأ
@@ -199,6 +266,41 @@ const SummaryInterface = () => {
           color: '#856404'
         }}>
           🔄 جاري تحويل الصوت إلى نص...
+        </div>
+      )}
+
+      {isSummarizing && (
+        <div style={{ 
+          marginTop: '20px',
+          padding: '15px',
+          backgroundColor: '#d1ecf1',
+          borderRadius: '5px',
+          color: '#0c5460'
+        }}>
+          🤖 جاري تلخيص النص باستخدام الذكاء الاصطناعي...
+        </div>
+      )}
+
+      {summary && (
+        <div style={{ 
+          marginTop: '30px', 
+          padding: '20px', 
+          backgroundColor: '#e7f3ff', 
+          borderRadius: '8px',
+          textAlign: 'right',
+          direction: 'rtl',
+          border: '2px solid #007bff'
+        }}>
+          <h3 style={{ color: '#007bff', marginBottom: '15px' }}>📝 الملخص الذكي:</h3>
+          <p style={{ 
+            fontSize: '16px', 
+            lineHeight: '1.6', 
+            color: '#333',
+            margin: '0',
+            fontWeight: 'bold'
+          }}>
+            {summary}
+          </p>
         </div>
       )}
     </div>
