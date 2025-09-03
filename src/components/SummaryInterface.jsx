@@ -224,6 +224,50 @@ const SummaryInterface = () => {
     }
   };
 
+  // دالة حفظ الملخص كملف نصي
+  const handleSave = () => {
+    if (!summary) {
+      alert('لا يوجد ملخص للحفظ. قم بإنشاء ملخص أولاً.');
+      return;
+    }
+
+    // إنشاء النص الكامل للحفظ
+    const fullText = `تطبيق تلخيصلي - ملخص المحاضرة
+========================================
+
+📝 الملخص الذكي:
+${summary}
+
+📄 النص الكامل:
+${transcribedText}
+
+========================================
+تم إنشاؤه بواسطة تطبيق تلخيصلي
+التاريخ: ${new Date().toLocaleDateString('ar-SA')}
+الوقت: ${new Date().toLocaleTimeString('ar-SA')}`;
+
+    // إنشاء Blob مع النص
+    const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
+    
+    // إنشاء رابط مؤقت
+    const url = URL.createObjectURL(blob);
+    
+    // إنشاء عنصر رابط للتنزيل
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ملخص_تلخيصلي_${new Date().toISOString().split('T')[0]}.txt`;
+    
+    // إضافة الرابط إلى الصفحة والنقر عليه
+    document.body.appendChild(link);
+    link.click();
+    
+    // تنظيف: إزالة الرابط وتحرير الذاكرة
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    console.log('تم حفظ الملف بنجاح!');
+  };
+
   // استدعاء sendAudioToAPI عندما يكون mediaBlobUrl متاحاً
   useEffect(() => {
     if (mediaBlobUrl && status === 'stopped') {
@@ -363,24 +407,44 @@ const SummaryInterface = () => {
           border: '2px solid #007bff'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-            <button
-              onClick={handleShare}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                fontSize: '14px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
-              title="مشاركة الملخص"
-            >
-              📤 مشاركة
-            </button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={handleSave}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#17a2b8',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+                title="حفظ الملخص كملف"
+              >
+                💾 حفظ
+              </button>
+              <button
+                onClick={handleShare}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+                title="مشاركة الملخص"
+              >
+                📤 مشاركة
+              </button>
+            </div>
             <h3 style={{ color: '#007bff', margin: '0' }}>📝 الملخص الذكي:</h3>
           </div>
           <p style={{ 
