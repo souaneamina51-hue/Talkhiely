@@ -17,14 +17,11 @@ import {
   Alert,
   AlertIcon,
   Divider,
-  Accordion,
-  AccordionItem,
-  AccordionButton,
-  AccordionPanel,
-  AccordionIcon,
+  Collapse,
   Flex,
   Spacer,
-  useColorModeValue
+  useColorModeValue,
+  useDisclosure
 } from '@chakra-ui/react';
 
 const SummaryInterface = () => {
@@ -487,42 +484,40 @@ ${summary.transcribedText}
 
                             <Divider />
 
-                            {/* Full Text Accordion */}
-                            <Accordion allowToggle>
-                              <AccordionItem border="none">
-                                <AccordionButton 
-                                  px={0} 
-                                  _hover={{ bg: "transparent" }}
-                                  _expanded={{ color: "blue.600" }}
+                            {/* Full Text Toggle */}
+                            <Box>
+                              <Button
+                                onClick={() => {}}
+                                variant="ghost"
+                                size="sm"
+                                color="blue.600"
+                                px={0}
+                                _hover={{ bg: "transparent", color: "blue.700" }}
+                              >
+                                <Text fontSize="sm">
+                                  عرض النص الكامل ▼
+                                </Text>
+                              </Button>
+                              
+                              <Box 
+                                bg="gray.50" 
+                                p={4} 
+                                borderRadius="md"
+                                border="1px solid" 
+                                borderColor="gray.200"
+                                mt={2}
+                              >
+                                <Text 
+                                  fontSize="md" 
+                                  lineHeight="tall" 
+                                  textAlign="right" 
+                                  dir="rtl"
+                                  color="gray.600"
                                 >
-                                  <Box flex="1" textAlign="right">
-                                    <Text fontSize="sm" color="gray.600">
-                                      عرض النص الكامل
-                                    </Text>
-                                  </Box>
-                                  <AccordionIcon />
-                                </AccordionButton>
-                                <AccordionPanel px={0} pt={3}>
-                                  <Box 
-                                    bg="gray.50" 
-                                    p={4} 
-                                    borderRadius="md"
-                                    border="1px solid" 
-                                    borderColor="gray.200"
-                                  >
-                                    <Text 
-                                      fontSize="md" 
-                                      lineHeight="tall" 
-                                      textAlign="right" 
-                                      dir="rtl"
-                                      color="gray.600"
-                                    >
-                                      {summaryItem.transcribedText}
-                                    </Text>
-                                  </Box>
-                                </AccordionPanel>
-                              </AccordionItem>
-                            </Accordion>
+                                  {summaryItem.transcribedText}
+                                </Text>
+                              </Box>
+                            </Box>
                           </VStack>
                         </CardBody>
                       </Card>
