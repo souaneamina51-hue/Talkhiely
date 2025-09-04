@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   Box,
@@ -10,68 +9,62 @@ import {
   Container,
   Card,
   CardBody,
-  Alert,
-  AlertIcon,
-  useColorModeValue,
-  Divider,
+  CardHeader,
   Input,
   FormControl,
   FormLabel,
   FormErrorMessage,
-  InputGroup,
-  InputRightElement,
-  IconButton,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
-  Link,
-  Checkbox
+  Alert,
+  AlertIcon,
+  Divider,
+  useColorModeValue,
+  Badge,
+  Spacer,
+  Flex
 } from '@chakra-ui/react';
 
 const AuthInterface = ({ trialStatus }) => {
-  const [showPassword, setShowPassword] = useState(false);
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [loginData, setLoginData] = useState({
-    email: '',
-    password: ''
-  });
-  const [registerData, setRegisterData] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    acceptTerms: false
-  });
   const [errors, setErrors] = useState({});
 
   const cardBg = useColorModeValue('white', 'gray.800');
   const mainBg = useColorModeValue('gray.50', 'gray.900');
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setErrors({});
-
-    // التحقق من البيانات
+  const validateForm = () => {
     const newErrors = {};
-    if (!loginData.email) newErrors.email = 'البريد الإلكتروني مطلوب';
-    if (!loginData.password) newErrors.password = 'كلمة المرور مطلوبة';
 
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      setIsLoading(false);
-      return;
+    if (!email) {
+      newErrors.email = 'البريد الإلكتروني مطلوب';
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      newErrors.email = 'البريد الإلكتروني غير صحيح';
     }
 
+    if (!password) {
+      newErrors.password = 'كلمة المرور مطلوبة';
+    } else if (password.length < 6) {
+      newErrors.password = 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+    }
+
+    if (!isLogin && password !== confirmPassword) {
+      newErrors.confirmPassword = 'كلمات المرور غير متطابقة';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleLogin = async () => {
+    if (!validateForm()) return;
+
+    setIsLoading(true);
     try {
-      // هنا يمكن إضافة منطق تسجيل الدخول الفعلي
-      console.log('تسجيل الدخول بالبيانات:', loginData);
-      
-      // محاكاة طلب API
+      // محاكاة طلب تسجيل الدخول
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      console.log('تم تسجيل الدخول بنجاح! (محاكاة)');
       alert('تم تسجيل الدخول بنجاح! (محاكاة)');
     } catch (error) {
       console.error('خطأ في تسجيل الدخول:', error);
@@ -81,34 +74,14 @@ const AuthInterface = ({ trialStatus }) => {
     }
   };
 
-  const handleRegister = async (e) => {
-    e.preventDefault();
+  const handleSignup = async () => {
+    if (!validateForm()) return;
+
     setIsLoading(true);
-    setErrors({});
-
-    // التحقق من البيانات
-    const newErrors = {};
-    if (!registerData.fullName) newErrors.fullName = 'الاسم الكامل مطلوب';
-    if (!registerData.email) newErrors.email = 'البريد الإلكتروني مطلوب';
-    if (!registerData.password) newErrors.password = 'كلمة المرور مطلوبة';
-    if (registerData.password !== registerData.confirmPassword) {
-      newErrors.confirmPassword = 'كلمات المرور غير متطابقة';
-    }
-    if (!registerData.acceptTerms) newErrors.acceptTerms = 'يجب الموافقة على الشروط والأحكام';
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      // هنا يمكن إضافة منطق التسجيل الفعلي
-      console.log('إنشاء حساب بالبيانات:', registerData);
-      
-      // محاكاة طلب API
+      // محاكاة طلب إنشاء الحساب
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      console.log('تم إنشاء الحساب بنجاح! (محاكاة)');
       alert('تم إنشاء الحساب بنجاح! (محاكاة)');
     } catch (error) {
       console.error('خطأ في إنشاء الحساب:', error);
@@ -133,240 +106,174 @@ const AuthInterface = ({ trialStatus }) => {
               <Heading as="h1" size="xl" mb={4} color="blue.600">
                 🎤 تطبيق التلخيص الذكي
               </Heading>
-              
+
               <Alert status="warning" borderRadius="lg" mb={6}>
                 <AlertIcon />
-                <VStack align="start" spacing={1} w="full">
+                <VStack align="start" spacing={1}>
                   <Text fontWeight="bold">انتهت فترتك التجريبية المجانية!</Text>
                   <Text fontSize="sm">
-                    لقد استمتعت بـ {7 - (trialStatus?.remainingDays || 0)} أيام من الاستخدام المجاني.
+                    لقد استمتعت بـ 7 أيام من الاستخدام المجاني.
+                  </Text>
+                  <Text fontSize="sm" color="gray.600">
+                    للمتابعة، يرجى تسجيل الدخول أو إنشاء حساب جديد.
                   </Text>
                 </VStack>
               </Alert>
 
-              <Text fontSize="lg" color="gray.600" mb={6}>
-                للمتابعة في استخدام التطبيق، يرجى تسجيل الدخول أو إنشاء حساب جديد
-              </Text>
+              {/* Trial Statistics */}
+              <Card bg="blue.50" border="1px solid" borderColor="blue.200" mb={6}>
+                <CardHeader pb={2}>
+                  <Text fontSize="md" fontWeight="semibold" color="blue.700">
+                    📊 إحصائيات فترتك التجريبية
+                  </Text>
+                </CardHeader>
+                <CardBody pt={0}>
+                  <VStack spacing={2}>
+                    <Flex w="full" justify="space-between">
+                      <Text fontSize="sm">مدة الاستخدام:</Text>
+                      <Badge colorScheme="blue">7 أيام كاملة</Badge>
+                    </Flex>
+                    <Flex w="full" justify="space-between">
+                      <Text fontSize="sm">معرف الجهاز:</Text>
+                      <Text fontSize="xs" color="gray.600">
+                        {trialStatus.deviceId?.substring(0, 15)}...
+                      </Text>
+                    </Flex>
+                  </VStack>
+                </CardBody>
+              </Card>
             </CardBody>
           </Card>
 
-          {/* Auth Tabs */}
+          {/* Authentication Form */}
           <Card w="full" bg={cardBg} shadow="lg">
-            <CardBody>
-              <Tabs isFitted variant="enclosed">
-                <TabList mb="1em">
-                  <Tab>تسجيل الدخول</Tab>
-                  <Tab>إنشاء حساب</Tab>
-                </TabList>
-                
-                <TabPanels>
-                  {/* Login Tab */}
-                  <TabPanel>
-                    <form onSubmit={handleLogin}>
-                      <VStack spacing={4}>
-                        {errors.general && (
-                          <Alert status="error" borderRadius="md">
-                            <AlertIcon />
-                            {errors.general}
-                          </Alert>
-                        )}
-
-                        <FormControl isInvalid={errors.email} isRequired>
-                          <FormLabel>البريد الإلكتروني</FormLabel>
-                          <Input
-                            type="email"
-                            value={loginData.email}
-                            onChange={(e) => setLoginData({...loginData, email: e.target.value})}
-                            placeholder="أدخل بريدك الإلكتروني"
-                          />
-                          <FormErrorMessage>{errors.email}</FormErrorMessage>
-                        </FormControl>
-
-                        <FormControl isInvalid={errors.password} isRequired>
-                          <FormLabel>كلمة المرور</FormLabel>
-                          <InputGroup>
-                            <Input
-                              type={showPassword ? 'text' : 'password'}
-                              value={loginData.password}
-                              onChange={(e) => setLoginData({...loginData, password: e.target.value})}
-                              placeholder="أدخل كلمة المرور"
-                            />
-                            <InputRightElement>
-                              <IconButton
-                                h="1.75rem"
-                                size="sm"
-                                onClick={() => setShowPassword(!showPassword)}
-                                icon={<Text>{showPassword ? '🙈' : '👁️'}</Text>}
-                                variant="ghost"
-                              />
-                            </InputRightElement>
-                          </InputGroup>
-                          <FormErrorMessage>{errors.password}</FormErrorMessage>
-                        </FormControl>
-
-                        <HStack w="full" justify="space-between">
-                          <Checkbox size="sm">تذكرني</Checkbox>
-                          <Link color="blue.500" fontSize="sm">
-                            نسيت كلمة المرور؟
-                          </Link>
-                        </HStack>
-
-                        <Button
-                          type="submit"
-                          colorScheme="blue"
-                          size="lg"
-                          w="full"
-                          isLoading={isLoading}
-                          loadingText="جاري تسجيل الدخول..."
-                        >
-                          تسجيل الدخول
-                        </Button>
-                      </VStack>
-                    </form>
-                  </TabPanel>
-
-                  {/* Register Tab */}
-                  <TabPanel>
-                    <form onSubmit={handleRegister}>
-                      <VStack spacing={4}>
-                        {errors.general && (
-                          <Alert status="error" borderRadius="md">
-                            <AlertIcon />
-                            {errors.general}
-                          </Alert>
-                        )}
-
-                        <FormControl isInvalid={errors.fullName} isRequired>
-                          <FormLabel>الاسم الكامل</FormLabel>
-                          <Input
-                            value={registerData.fullName}
-                            onChange={(e) => setRegisterData({...registerData, fullName: e.target.value})}
-                            placeholder="أدخل اسمك الكامل"
-                          />
-                          <FormErrorMessage>{errors.fullName}</FormErrorMessage>
-                        </FormControl>
-
-                        <FormControl isInvalid={errors.email} isRequired>
-                          <FormLabel>البريد الإلكتروني</FormLabel>
-                          <Input
-                            type="email"
-                            value={registerData.email}
-                            onChange={(e) => setRegisterData({...registerData, email: e.target.value})}
-                            placeholder="أدخل بريدك الإلكتروني"
-                          />
-                          <FormErrorMessage>{errors.email}</FormErrorMessage>
-                        </FormControl>
-
-                        <FormControl isInvalid={errors.password} isRequired>
-                          <FormLabel>كلمة المرور</FormLabel>
-                          <InputGroup>
-                            <Input
-                              type={showPassword ? 'text' : 'password'}
-                              value={registerData.password}
-                              onChange={(e) => setRegisterData({...registerData, password: e.target.value})}
-                              placeholder="أدخل كلمة مرور قوية"
-                            />
-                            <InputRightElement>
-                              <IconButton
-                                h="1.75rem"
-                                size="sm"
-                                onClick={() => setShowPassword(!showPassword)}
-                                icon={<Text>{showPassword ? '🙈' : '👁️'}</Text>}
-                                variant="ghost"
-                              />
-                            </InputRightElement>
-                          </InputGroup>
-                          <FormErrorMessage>{errors.password}</FormErrorMessage>
-                        </FormControl>
-
-                        <FormControl isInvalid={errors.confirmPassword} isRequired>
-                          <FormLabel>تأكيد كلمة المرور</FormLabel>
-                          <Input
-                            type={showPassword ? 'text' : 'password'}
-                            value={registerData.confirmPassword}
-                            onChange={(e) => setRegisterData({...registerData, confirmPassword: e.target.value})}
-                            placeholder="أعد إدخال كلمة المرور"
-                          />
-                          <FormErrorMessage>{errors.confirmPassword}</FormErrorMessage>
-                        </FormControl>
-
-                        <FormControl isInvalid={errors.acceptTerms}>
-                          <Checkbox
-                            isChecked={registerData.acceptTerms}
-                            onChange={(e) => setRegisterData({...registerData, acceptTerms: e.target.checked})}
-                          >
-                            <Text fontSize="sm">
-                              أوافق على <Link color="blue.500">الشروط والأحكام</Link> و
-                              <Link color="blue.500"> سياسة الخصوصية</Link>
-                            </Text>
-                          </Checkbox>
-                          <FormErrorMessage>{errors.acceptTerms}</FormErrorMessage>
-                        </FormControl>
-
-                        <Button
-                          type="submit"
-                          colorScheme="green"
-                          size="lg"
-                          w="full"
-                          isLoading={isLoading}
-                          loadingText="جاري إنشاء الحساب..."
-                        >
-                          إنشاء حساب جديد
-                        </Button>
-                      </VStack>
-                    </form>
-                  </TabPanel>
-                </TabPanels>
-              </Tabs>
-
-              <Divider my={6} />
-
-              {/* Direct Subscription Option */}
-              <VStack spacing={4}>
-                <Text fontSize="sm" color="gray.500">أو</Text>
+            <CardHeader>
+              <HStack spacing={4} justify="center">
                 <Button
-                  onClick={handleSubscribe}
-                  colorScheme="purple"
+                  variant={isLogin ? "solid" : "ghost"}
+                  colorScheme="blue"
+                  onClick={() => setIsLogin(true)}
+                >
+                  تسجيل الدخول
+                </Button>
+                <Button
+                  variant={!isLogin ? "solid" : "ghost"}
+                  colorScheme="blue"
+                  onClick={() => setIsLogin(false)}
+                >
+                  إنشاء حساب
+                </Button>
+              </HStack>
+            </CardHeader>
+
+            <CardBody>
+              <VStack spacing={4}>
+                {errors.general && (
+                  <Alert status="error" borderRadius="md">
+                    <AlertIcon />
+                    <Text>{errors.general}</Text>
+                  </Alert>
+                )}
+
+                <FormControl isInvalid={errors.email}>
+                  <FormLabel>البريد الإلكتروني</FormLabel>
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="أدخل بريدك الإلكتروني"
+                    dir="ltr"
+                  />
+                  <FormErrorMessage>{errors.email}</FormErrorMessage>
+                </FormControl>
+
+                <FormControl isInvalid={errors.password}>
+                  <FormLabel>كلمة المرور</FormLabel>
+                  <Input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="أدخل كلمة المرور"
+                    dir="ltr"
+                  />
+                  <FormErrorMessage>{errors.password}</FormErrorMessage>
+                </FormControl>
+
+                {!isLogin && (
+                  <FormControl isInvalid={errors.confirmPassword}>
+                    <FormLabel>تأكيد كلمة المرور</FormLabel>
+                    <Input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="أعد إدخال كلمة المرور"
+                      dir="ltr"
+                    />
+                    <FormErrorMessage>{errors.confirmPassword}</FormErrorMessage>
+                  </FormControl>
+                )}
+
+                <Button
+                  colorScheme="blue"
                   size="lg"
                   w="full"
-                  leftIcon={<Text>⭐</Text>}
+                  onClick={isLogin ? handleLogin : handleSignup}
+                  isLoading={isLoading}
+                  loadingText={isLogin ? "جاري تسجيل الدخول..." : "جاري إنشاء الحساب..."}
                 >
-                  اشترك مباشرة بدون حساب
+                  {isLogin ? "تسجيل الدخول" : "إنشاء حساب"}
                 </Button>
-              </VStack>
 
-              {/* Features List */}
-              <Box mt={8} textAlign="right">
-                <Text fontSize="md" fontWeight="bold" mb={3} color="gray.700">
-                  مميزات الاشتراك:
+                <Divider />
+
+                <Button
+                  colorScheme="green"
+                  variant="outline"
+                  size="lg"
+                  w="full"
+                  onClick={handleSubscribe}
+                  leftIcon={<Text>💎</Text>}
+                >
+                  اشترك الآن والحصول على وصول فوري
+                </Button>
+
+                <Text fontSize="sm" color="gray.600" textAlign="center">
+                  بالمتابعة، أنت توافق على شروط الخدمة وسياسة الخصوصية
                 </Text>
-                <VStack align="start" spacing={2} fontSize="sm" color="gray.600">
-                  <HStack>
-                    <Text>✅</Text>
-                    <Text>تلخيص غير محدود للتسجيلات</Text>
-                  </HStack>
-                  <HStack>
-                    <Text>✅</Text>
-                    <Text>حفظ الملخصات في السحابة</Text>
-                  </HStack>
-                  <HStack>
-                    <Text>✅</Text>
-                    <Text>مشاركة متقدمة للملخصات</Text>
-                  </HStack>
-                  <HStack>
-                    <Text>✅</Text>
-                    <Text>دعم فني على مدار الساعة</Text>
-                  </HStack>
-                  <HStack>
-                    <Text>✅</Text>
-                    <Text>تحليلات وإحصائيات متقدمة</Text>
-                  </HStack>
-                  <HStack>
-                    <Text>✅</Text>
-                    <Text>أولوية في المعالجة</Text>
-                  </HStack>
-                </VStack>
-              </Box>
+              </VStack>
+            </CardBody>
+          </Card>
+
+          {/* Features Preview */}
+          <Card w="full" bg={cardBg} shadow="md">
+            <CardHeader>
+              <Text fontSize="lg" fontWeight="semibold" color="blue.600">
+                ✨ ما ستحصل عليه مع الحساب المدفوع
+              </Text>
+            </CardHeader>
+            <CardBody>
+              <VStack spacing={3} align="start">
+                <HStack>
+                  <Text>🎤</Text>
+                  <Text fontSize="sm">تسجيل صوتي غير محدود</Text>
+                </HStack>
+                <HStack>
+                  <Text>🤖</Text>
+                  <Text fontSize="sm">تلخيص ذكي باستخدام AI متقدم</Text>
+                </HStack>
+                <HStack>
+                  <Text>💾</Text>
+                  <Text fontSize="sm">حفظ ومشاركة الملخصات</Text>
+                </HStack>
+                <HStack>
+                  <Text>📱</Text>
+                  <Text fontSize="sm">الوصول من جميع الأجهزة</Text>
+                </HStack>
+                <HStack>
+                  <Text>🔒</Text>
+                  <Text fontSize="sm">خصوصية وأمان عالي</Text>
+                </HStack>
+              </VStack>
             </CardBody>
           </Card>
         </VStack>
