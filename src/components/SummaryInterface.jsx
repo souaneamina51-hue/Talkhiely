@@ -1,21 +1,17 @@
-
 import React, { useState, useEffect } from 'react';
 import { useReactMediaRecorder } from 'react-media-recorder';
 import {
   Box,
   Button,
-  Heading,
-  Text,
   VStack,
   HStack,
+  Text,
+  Heading,
   Container,
   Card,
   CardBody,
-  CardHeader,
   Badge,
-  Progress,
   Alert,
-  AlertIcon,
   Divider,
   Collapse,
   Flex,
@@ -71,24 +67,24 @@ const SummaryInterface = () => {
 
   const sendAudioToAPI = async () => {
     if (!mediaBlobUrl) return;
-    
+
     setIsProcessing(true);
     try {
       const response = await fetch(mediaBlobUrl);
       const audioBlob = await response.blob();
-      
+
       const formData = new FormData();
       formData.append('audio_file', audioBlob, 'recording.wav');
-      
+
       setTimeout(async () => {
         const simulatedText = 'هذا نص تجريبي يمثل النص المستخرج من التسجيل الصوتي. يتحدث عن أهمية التكنولوجيا في حياتنا اليومية وكيف يمكن للذكاء الاصطناعي أن يساعد في تحسين العديد من جوانب العمل والتعليم. كما يذكر النص فوائد استخدام التطبيقات الذكية في تسهيل المهام المختلفة.';
         setTranscribedText(simulatedText);
         setIsProcessing(false);
         console.log('النص المستخرج:', simulatedText);
-        
+
         await summarizeText(simulatedText);
       }, 2000);
-      
+
     } catch (error) {
       console.error('خطأ في إرسال الصوت إلى API:', error);
       setTranscribedText('خطأ في الاتصال. تأكد من الاتصال بالإنترنت.');
@@ -98,7 +94,7 @@ const SummaryInterface = () => {
 
   const summarizeText = async (text) => {
     if (!text) return;
-    
+
     setIsSummarizing(true);
     try {
       const requestData = {
@@ -106,11 +102,11 @@ const SummaryInterface = () => {
         max_length: 100,
         min_length: 30
       };
-      
+
       setTimeout(() => {
         const simulatedSummary = 'ملخص: النص يتحدث عن أهمية التكنولوجيا والذكاء الاصطناعي في تحسين حياتنا اليومية، خاصة في مجالي العمل والتعليم.';
         setSummary(simulatedSummary);
-        
+
         const newSummary = {
           id: Date.now(),
           text: simulatedSummary,
@@ -118,12 +114,12 @@ const SummaryInterface = () => {
           date: new Date(),
           timestamp: new Date().toLocaleString('ar-SA')
         };
-        
+
         setSummaries(prevSummaries => [...prevSummaries, newSummary]);
         setIsSummarizing(false);
         console.log('الملخص:', simulatedSummary);
       }, 3000);
-      
+
     } catch (error) {
       console.error('خطأ في تلخيص النص:', error);
       setSummary('خطأ في الاتصال بخدمة التلخيص.');
@@ -163,13 +159,13 @@ const SummaryInterface = () => {
   };
 
   const fallbackShare = (shareText = null) => {
-    const textToShare = shareText || (summaries.length > 0 ? 
+    const textToShare = shareText || (summaries.length > 0 ?
       summaries
         .sort((a, b) => new Date(a.date) - new Date(b.date))
         .map((summary, index) => `الملخص ${index + 1} (${summary.timestamp}):\n${summary.text}\n\n`)
-        .join('') 
+        .join('')
       : `الملخص الذكي:\n\n${summary}\n\nالنص الكامل:\n\n${transcribedText}`);
-    
+
     if (navigator.clipboard) {
       navigator.clipboard.writeText(textToShare).then(() => {
         alert('تم نسخ الملخصات إلى الحافظة! يمكنك لصقها في أي تطبيق آخر.');
@@ -240,12 +236,12 @@ ${summary.transcribedText}
     const link = document.createElement('a');
     link.href = url;
     link.download = `جميع_الملخصات_تلخيصلي_${new Date().toISOString().split('T')[0]}.txt`;
-    
+
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    
+
     console.log('تم حفظ الملف بنجاح!');
   };
 
@@ -264,7 +260,7 @@ ${summary.transcribedText}
   const getStatusText = () => {
     if (isProcessing) return 'جاري معالجة الصوت...';
     if (isSummarizing) return 'جاري تلخيص النص...';
-    
+
     switch (status) {
       case 'recording':
         return 'التسجيل جارٍ...';
@@ -293,17 +289,17 @@ ${summary.transcribedText}
               <Heading as="h1" size="xl" mb={4} color="blue.600">
                 🎤 واجهة التلخيص الذكي
               </Heading>
-              
+
               {/* Timer Display */}
               <Box mb={4}>
                 <Text fontSize="3xl" fontWeight="bold" color="gray.600">
                   {formatTime(timer)}
                 </Text>
-                <Badge 
-                  colorScheme={getStatusColor()} 
-                  variant="solid" 
-                  fontSize="md" 
-                  px={3} 
+                <Badge
+                  colorScheme={getStatusColor()}
+                  variant="solid"
+                  fontSize="md"
+                  px={3}
                   py={1}
                   borderRadius="full"
                 >
@@ -324,7 +320,7 @@ ${summary.transcribedText}
                 >
                   ابدأ التسجيل
                 </Button>
-                
+
                 <Button
                   onClick={handleStop}
                   isDisabled={status !== 'recording'}
@@ -345,11 +341,11 @@ ${summary.transcribedText}
                 <Text mb={3} fontSize="lg" fontWeight="semibold">
                   🎵 التسجيل المكتمل
                 </Text>
-                <Box 
-                  as="audio" 
-                  src={mediaBlobUrl} 
-                  controls 
-                  w="full" 
+                <Box
+                  as="audio"
+                  src={mediaBlobUrl}
+                  controls
+                  w="full"
                   maxW="500px"
                   mx="auto"
                 />
@@ -360,7 +356,6 @@ ${summary.transcribedText}
           {/* Processing Alerts */}
           {isProcessing && (
             <Alert status="warning" borderRadius="lg">
-              <AlertIcon />
               <VStack align="start" spacing={2} w="full">
                 <Text fontWeight="bold">🔄 جاري تحويل الصوت إلى نص...</Text>
                 <Progress size="sm" isIndeterminate colorScheme="orange" w="full" />
@@ -370,7 +365,6 @@ ${summary.transcribedText}
 
           {isSummarizing && (
             <Alert status="info" borderRadius="lg">
-              <AlertIcon />
               <VStack align="start" spacing={2} w="full">
                 <Text fontWeight="bold">🤖 جاري تلخيص النص باستخدام الذكاء الاصطناعي...</Text>
                 <Progress size="sm" isIndeterminate colorScheme="blue" w="full" />
@@ -387,10 +381,10 @@ ${summary.transcribedText}
                 </Heading>
               </CardHeader>
               <CardBody>
-                <Text 
-                  fontSize="lg" 
-                  lineHeight="tall" 
-                  textAlign="right" 
+                <Text
+                  fontSize="lg"
+                  lineHeight="tall"
+                  textAlign="right"
                   dir="rtl"
                   p={4}
                   bg="gray.50"
@@ -431,17 +425,17 @@ ${summary.transcribedText}
                   </HStack>
                 </Flex>
               </CardHeader>
-              
+
               <CardBody>
                 <VStack spacing={6}>
                   {summaries
                     .sort((a, b) => new Date(a.date) - new Date(b.date))
                     .map((summaryItem, index) => (
-                      <Card 
+                      <Card
                         key={summaryItem.id}
-                        w="full" 
-                        bg="blue.50" 
-                        border="2px solid" 
+                        w="full"
+                        bg="blue.50"
+                        border="2px solid"
                         borderColor="blue.200"
                         shadow="sm"
                       >
@@ -455,7 +449,7 @@ ${summary.transcribedText}
                             </Badge>
                           </Flex>
                         </CardHeader>
-                        
+
                         <CardBody>
                           <VStack spacing={4} align="stretch">
                             {/* Summary */}
@@ -463,17 +457,17 @@ ${summary.transcribedText}
                               <Text fontSize="sm" color="blue.600" fontWeight="semibold" mb={2}>
                                 الملخص الذكي:
                               </Text>
-                              <Box 
-                                bg="white" 
-                                p={4} 
-                                borderRadius="md" 
-                                border="1px solid" 
+                              <Box
+                                bg="white"
+                                p={4}
+                                borderRadius="md"
+                                border="1px solid"
                                 borderColor="blue.100"
                               >
-                                <Text 
-                                  fontSize="lg" 
-                                  fontWeight="bold" 
-                                  textAlign="right" 
+                                <Text
+                                  fontSize="lg"
+                                  fontWeight="bold"
+                                  textAlign="right"
                                   dir="rtl"
                                   color="gray.700"
                                 >
@@ -498,19 +492,19 @@ ${summary.transcribedText}
                                   عرض النص الكامل ▼
                                 </Text>
                               </Button>
-                              
-                              <Box 
-                                bg="gray.50" 
-                                p={4} 
+
+                              <Box
+                                bg="gray.50"
+                                p={4}
                                 borderRadius="md"
-                                border="1px solid" 
+                                border="1px solid"
                                 borderColor="gray.200"
                                 mt={2}
                               >
-                                <Text 
-                                  fontSize="md" 
-                                  lineHeight="tall" 
-                                  textAlign="right" 
+                                <Text
+                                  fontSize="md"
+                                  lineHeight="tall"
+                                  textAlign="right"
                                   dir="rtl"
                                   color="gray.600"
                                 >
