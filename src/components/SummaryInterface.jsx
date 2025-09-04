@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useReactMediaRecorder } from 'react-media-recorder';
+import TrialStatusBanner from './TrialStatusBanner';
 import {
   Box,
   Button,
@@ -22,7 +23,7 @@ import {
   CardHeader
 } from '@chakra-ui/react';
 
-const SummaryInterface = () => {
+const SummaryInterface = ({ trialStatus }) => {
   const [timer, setTimer] = useState(0);
   const [isActive, setIsActive] = useState(false);
   const [transcribedText, setTranscribedText] = useState('');
@@ -273,10 +274,22 @@ ${summary.transcribedText}
     return 'blue';
   };
 
+  const handleUpgrade = () => {
+    alert('ميزة الترقية ستكون متاحة قريباً!');
+  };
+
   return (
     <Box bg={mainBg} minH="100vh" py={8}>
       <Container maxW="4xl">
         <VStack spacing={8}>
+          {/* Trial Status Banner */}
+          {trialStatus && (
+            <TrialStatusBanner 
+              trialStatus={trialStatus} 
+              onUpgrade={handleUpgrade}
+            />
+          )}
+
           {/* Header */}
           <Card w="full" bg={cardBg} shadow="lg">
             <CardBody textAlign="center">

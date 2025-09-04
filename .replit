@@ -66,7 +66,7 @@ externalPort = 3000
 expertMode = true
 
 [workflows]
-runButton = "Project"
+runButton = "Full Application"
 
 [[workflows.workflow]]
 name = "Project"
@@ -88,3 +88,16 @@ outputType = "webview"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Full Application"
+author = 47183547
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node server.js"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
