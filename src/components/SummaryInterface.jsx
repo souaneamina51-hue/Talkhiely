@@ -17,7 +17,9 @@ import {
   Flex,
   Spacer,
   useColorModeValue,
-  useDisclosure
+  useDisclosure,
+  Progress,
+  CardHeader
 } from '@chakra-ui/react';
 
 const SummaryInterface = () => {
@@ -69,22 +71,17 @@ const SummaryInterface = () => {
     if (!mediaBlobUrl) return;
 
     setIsProcessing(true);
+
     try {
-      const response = await fetch(mediaBlobUrl);
-      const audioBlob = await response.blob();
+      const simulatedText =
+        'هذا نص تجريبي يمثل النص المستخرج من التسجيل الصوتي. يتحدث عن أهمية التكنولوجيا في حياتنا اليومية وكيف يمكن للذكاء الاصطناعي أن يساعد في تحسين العديد من جوانب العمل والتعليم. كما يذكر النص فوائد استخدام التطبيقات الذكية في تسهيل المهام المختلفة.';
 
-      const formData = new FormData();
-      formData.append('audio_file', audioBlob, 'recording.wav');
+      setTranscribedText(simulatedText);
+      console.log('النص المستخرج:', simulatedText);
 
-      setTimeout(async () => {
-        const simulatedText = 'هذا نص تجريبي يمثل النص المستخرج من التسجيل الصوتي. يتحدث عن أهمية التكنولوجيا في حياتنا اليومية وكيف يمكن للذكاء الاصطناعي أن يساعد في تحسين العديد من جوانب العمل والتعليم. كما يذكر النص فوائد استخدام التطبيقات الذكية في تسهيل المهام المختلفة.';
-        setTranscribedText(simulatedText);
-        setIsProcessing(false);
-        console.log('النص المستخرج:', simulatedText);
+      await summarizeText(simulatedText);
 
-        await summarizeText(simulatedText);
-      }, 2000);
-
+      setIsProcessing(false);
     } catch (error) {
       console.error('خطأ في إرسال الصوت إلى API:', error);
       setTranscribedText('خطأ في الاتصال. تأكد من الاتصال بالإنترنت.');
@@ -103,23 +100,20 @@ const SummaryInterface = () => {
         min_length: 30
       };
 
-      setTimeout(() => {
-        const simulatedSummary = 'ملخص: النص يتحدث عن أهمية التكنولوجيا والذكاء الاصطناعي في تحسين حياتنا اليومية، خاصة في مجالي العمل والتعليم.';
-        setSummary(simulatedSummary);
+      const simulatedSummary = 'ملخص: النص يتحدث عن أهمية التكنولوجيا والذكاء الاصطناعي في تحسين حياتنا اليومية، خاصة في مجالي العمل والتعليم.';
 
-        const newSummary = {
-          id: Date.now(),
-          text: simulatedSummary,
-          transcribedText: text,
-          date: new Date(),
-          timestamp: new Date().toLocaleString('ar-SA')
-        };
+      setSummary(simulatedSummary);
+      const newSummary = {
+        id: Date.now(),
+        text: simulatedSummary,
+        transcribedText: text,
+        date: new Date(),
+        timestamp: new Date().toLocaleString('ar-SA')
+      };
 
-        setSummaries(prevSummaries => [...prevSummaries, newSummary]);
-        setIsSummarizing(false);
-        console.log('الملخص:', simulatedSummary);
-      }, 3000);
-
+      setSummaries(prevSummaries => [...prevSummaries, newSummary]);
+      setIsSummarizing(false);
+      console.log('الملخص:', simulatedSummary);
     } catch (error) {
       console.error('خطأ في تلخيص النص:', error);
       setSummary('خطأ في الاتصال بخدمة التلخيص.');
@@ -515,8 +509,7 @@ ${summary.transcribedText}
                           </VStack>
                         </CardBody>
                       </Card>
-                    ))
-                  }
+                    ))}
                 </VStack>
               </CardBody>
             </Card>
