@@ -1,4 +1,4 @@
-// vite.config.js
+// vite.config.mjs
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0',
-    port: PORT,
+    port: PORT, // مهم: يستخدم PORT من Replit
     allowedHosts: ['.repl.co', '.replit.dev']
   }
 })
