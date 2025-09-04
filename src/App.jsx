@@ -26,10 +26,10 @@ const LoadingScreen = () => (
 );
 
 const App = () => {
-  const { trialStatus, refreshTrialStatus } = useTrialPeriod();
+  const { trialStatus, isChecking, refreshTrialStatus } = useTrialPeriod();
 
   // عرض شاشة التحميل أثناء فحص الفترة التجريبية
-  if (trialStatus.status === 'loading') {
+  if (isChecking) {
     return (
       <ChakraProvider>
         <LoadingScreen />

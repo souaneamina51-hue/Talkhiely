@@ -10,6 +10,7 @@ export const useTrialPeriod = () => {
     remainingDays: 0,
     deviceId: null
   });
+  const [isChecking, setIsChecking] = useState(true);
 
   // إنشاء أو استرجاع معرف الجهاز
   const getOrCreateDeviceId = () => {
@@ -46,6 +47,9 @@ export const useTrialPeriod = () => {
         deviceId: deviceId
       });
 
+      // إخفاء رسالة التحقق بعد اكتمال الاستجابة
+      setIsChecking(false);
+
     } catch (error) {
       console.error('خطأ في التحقق من الفترة التجريبية:', error);
       
@@ -72,6 +76,9 @@ export const useTrialPeriod = () => {
           deviceId: deviceId
         });
       }
+      
+      // إخفاء رسالة التحقق حتى في حالة الفشل
+      setIsChecking(false);
     }
   };
 
@@ -81,6 +88,7 @@ export const useTrialPeriod = () => {
 
   return {
     trialStatus,
+    isChecking,
     refreshTrialStatus: checkTrialStatus
   };
 };
