@@ -49,7 +49,7 @@ app.post('/api/check-trial', async (req, res) => {
 
     const database = await readDatabase();
     const now = new Date();
-    
+
     // التحقق من وجود الجهاز في قاعدة البيانات
     if (database[deviceId]) {
       const trialStartDate = new Date(database[deviceId].trial_start_date);
@@ -74,7 +74,7 @@ app.post('/api/check-trial', async (req, res) => {
     } else {
       // جهاز جديد - إنشاء فترة تجريبية جديدة
       const trialStartDate = now.toISOString();
-      
+
       database[deviceId] = {
         device_id: deviceId,
         trial_start_date: trialStartDate,
@@ -107,7 +107,7 @@ app.get('/api/trial-stats', async (req, res) => {
   try {
     const database = await readDatabase();
     const devices = Object.values(database);
-    
+
     const stats = {
       total_devices: devices.length,
       active_trials: devices.filter(d => d.status === 'active').length,
