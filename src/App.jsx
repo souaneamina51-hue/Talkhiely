@@ -2,7 +2,7 @@
 import React from 'react';
 import { ChakraProvider } from '@chakra-ui/react';
 import SummaryInterface from './components/SummaryInterface';
-import LoginInterface from './components/LoginInterface';
+import AuthInterface from './components/AuthInterface';
 import { useTrialPeriod } from './hooks/useTrialPeriod';
 import {
   Box,
@@ -41,7 +41,7 @@ const App = () => {
   if (trialStatus.status === 'expired') {
     return (
       <ChakraProvider>
-        <LoginInterface trialStatus={trialStatus} />
+        <AuthInterface trialStatus={trialStatus} />
       </ChakraProvider>
     );
   }

@@ -1,8 +1,12 @@
 
-const express = require('express');
-const cors = require('cors');
-const fs = require('fs').promises;
-const path = require('path');
+import express from 'express';
+import cors from 'cors';
+import { promises as fs } from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -130,7 +134,7 @@ app.get('/api/trial-stats', async (req, res) => {
 // بدء الخادم
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 خادم الفترة التجريبية يعمل على المنفذ ${PORT}`);
-  console.log(`📊 احصائيات الفترة التجريبية: http://localhost:${PORT}/api/trial-stats`);
+  console.log(`📊 احصائيات الفترة التجريبية: http://0.0.0.0:${PORT}/api/trial-stats`);
 });
 
-module.exports = app;
+export default app;
