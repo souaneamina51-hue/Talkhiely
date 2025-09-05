@@ -155,68 +155,210 @@ class AlgerianAudioProcessor {
     }
   }
 
-  // الحصول على مدة الصوت الدقيقة باستخدام Web Audio API
+  // الحصول على مدة الصوت الدقيقة مع إصلاح مشكلة Infinity
   async getAccurateAudioDuration(audioBlob) {
+    console.log(`🔍 [حساب المدة] بدء حساب مدة التسجيل، حجم الملف: ${Math.round(audioBlob.size / 1024)}KB`);
+    
+    // الطريقة الأولى: Web Audio API (الأكثر دقة)
     try {
       if (this.audioContext) {
+        console.log(`⚙️ [Web Audio API] محاولة فك تشفير الملف`);
         const arrayBuffer = await audioBlob.arrayBuffer();
         const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-        return audioBuffer.duration;
+        const duration = audioBuffer.duration;
+        
+        if (duration && duration !== Infinity && !isNaN(duration) && duration > 0) {
+          console.log(`✅ [Web Audio API] مدة دقيقة: ${duration.toFixed(2)} ثانية`);
+          return duration;
+        } else {
+          console.warn(`⚠️ [Web Audio API] مدة غير صالحة: ${duration}`);
+        }
       }
     } catch (error) {
-      console.warn('فشل Web Audio API، استخدام HTML Audio:', error);
+      console.warn(`❌ [Web Audio API] فشل:`, error.message);
     }
 
-    // fallback لـ HTML Audio
+    // الطريقة الثانية: تقدير دقيق حسب نوع الملف وحجمه
+    const estimatedDuration = this.estimateDurationFromFileProperties(audioBlob);
+    if (estimatedDuration > 0) {
+      console.log(`📊 [تقدير ذكي] مدة مقدرة: ${estimatedDuration.toFixed(2)} ثانية`);
+      return estimatedDuration;
+    }
+
+    // الطريقة الثالثة: HTML Audio مع معالجة شاملة لمشكلة Infinity
+    console.log(`🎵 [HTML Audio] محاولة HTML Audio كطريقة احتياطية`);
     return new Promise((resolve) => {
+      let resolved = false;
+      
+      const safeResolve = (duration, method) => {
+        if (resolved) return;
+        resolved = true;
+        console.log(`✅ [${method}] مدة محددة: ${duration.toFixed(2)} ثانية`);
+        resolve(duration);
+      };
+
       try {
         const audio = new Audio(URL.createObjectURL(audioBlob));
+        
+        // تعيين خصائص مهمة
+        audio.preload = 'metadata';
+        audio.volume = 0; // صامت لتجنب التشغيل غير المرغوب
+        
+        let attemptCount = 0;
+        const maxAttempts = 5;
 
-        const handleLoadedMetadata = () => {
-          const duration = audio.duration || 0;
-          if (duration === Infinity || isNaN(duration)) {
-            console.warn('مدة غير صالحة، استخدام قيمة تقديرية');
-            resolve(30); // قيمة افتراضية آمنة
-          } else {
-            resolve(duration);
+        const checkDuration = () => {
+          attemptCount++;
+          console.log(`🔍 [فحص ${attemptCount}/${maxAttempts}] duration: ${audio.duration}, readyState: ${audio.readyState}`);
+          
+          if (audio.duration && audio.duration !== Infinity && !isNaN(audio.duration)) {
+            cleanup();
+            safeResolve(audio.duration, `HTML Audio - محاولة ${attemptCount}`);
+            return true;
           }
-          cleanup();
+          
+          if (attemptCount >= maxAttempts) {
+            console.warn(`⚠️ [HTML Audio] فشل بعد ${maxAttempts} محاولات`);
+            cleanup();
+            // استخدام تقدير ذكي بناءً على حجم الملف
+            const fallbackDuration = this.calculateFallbackDuration(audioBlob);
+            safeResolve(fallbackDuration, 'تقدير احتياطي');
+            return true;
+          }
+          
+          return false;
         };
 
-        const handleError = () => {
-          console.warn('فشل في تحديد مدة الصوت');
-          resolve(30); // قيمة افتراضية
+        const handleLoadedMetadata = () => {
+          console.log(`📊 [loadedmetadata] تم تحميل البيانات الوصفية`);
+          if (!checkDuration()) {
+            // إذا لم تنجح، انتظر قليلاً وحاول مرة أخرى
+            setTimeout(checkDuration, 500);
+          }
+        };
+
+        const handleCanPlay = () => {
+          console.log(`🎼 [canplay] الصوت جاهز للتشغيل`);
+          if (!checkDuration()) {
+            setTimeout(checkDuration, 300);
+          }
+        };
+
+        const handleError = (error) => {
+          console.error(`❌ [HTML Audio Error]`, error);
           cleanup();
+          const fallbackDuration = this.calculateFallbackDuration(audioBlob);
+          safeResolve(fallbackDuration, 'خطأ - تقدير احتياطي');
         };
 
         const cleanup = () => {
-          URL.revokeObjectURL(audio.src);
-          audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-          audio.removeEventListener('error', handleError);
+          try {
+            audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            audio.removeEventListener('canplay', handleCanPlay);
+            audio.removeEventListener('error', handleError);
+            if (audio.src && audio.src.startsWith('blob:')) {
+              URL.revokeObjectURL(audio.src);
+            }
+            audio.src = '';
+          } catch (e) {
+            console.warn(`⚠️ [تنظيف HTML Audio] خطأ في التنظيف:`, e.message);
+          }
         };
 
+        // إضافة المستمعات
         audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+        audio.addEventListener('canplay', handleCanPlay);
         audio.addEventListener('error', handleError);
 
-        // timeout للحماية من التعليق
+        // timeout نهائي للحماية من التعليق
         setTimeout(() => {
-          if (audio.duration) {
-            handleLoadedMetadata();
-          } else {
-            handleError();
+          if (!resolved) {
+            console.warn(`⏰ [انتهاء المهلة] انتهت مهلة 8 ثواني`);
+            cleanup();
+            const fallbackDuration = this.calculateFallbackDuration(audioBlob);
+            safeResolve(fallbackDuration, 'انتهاء المهلة - تقدير احتياطي');
           }
-        }, 5000);
+        }, 8000);
+
+        // بدء التحميل
+        console.log(`📥 [بدء التحميل] تحميل البيانات الوصفية`);
+        audio.load();
 
       } catch (error) {
-        console.warn('خطأ في إنشاء عنصر الصوت:', error);
-        resolve(30);
+        console.error(`💥 [HTML Audio Exception]`, error);
+        const fallbackDuration = this.calculateFallbackDuration(audioBlob);
+        safeResolve(fallbackDuration, 'استثناء - تقدير احتياطي');
       }
     });
   }
 
-  // معالجة التسجيلات الطويلة - الإصدار المحسن وفقاً للتوصيات العاجلة
+  // تقدير المدة بناءً على خصائص الملف
+  estimateDurationFromFileProperties(audioBlob) {
+    console.log(`🧮 [تقدير ذكي] تحليل خصائص الملف`);
+    
+    const sizeInMB = audioBlob.size / (1024 * 1024);
+    const fileType = audioBlob.type.toLowerCase();
+    
+    console.log(`📊 [خصائص الملف] حجم: ${sizeInMB.toFixed(2)}MB، نوع: ${fileType}`);
+    
+    // معدلات تقديرية حسب نوع الملف (بالثواني لكل ميجابايت)
+    let secondsPerMB = 60; // افتراضي
+    
+    if (fileType.includes('mp3')) {
+      secondsPerMB = 480; // MP3 عادة 128kbps
+    } else if (fileType.includes('wav')) {
+      secondsPerMB = 60; // WAV غير مضغوط
+    } else if (fileType.includes('m4a') || fileType.includes('aac')) {
+      secondsPerMB = 400; // AAC مضغوط
+    } else if (fileType.includes('ogg')) {
+      secondsPerMB = 300; // OGG مضغوط متوسط
+    } else if (fileType.includes('webm')) {
+      secondsPerMB = 250; // WebM مضغوط
+    }
+    
+    const estimatedDuration = sizeInMB * secondsPerMB;
+    
+    // فحص معقولية التقدير (بين 1 ثانية و 10 ساعات)
+    if (estimatedDuration >= 1 && estimatedDuration <= 36000) {
+      console.log(`✅ [تقدير معقول] ${estimatedDuration.toFixed(1)} ثانية (${(estimatedDuration/60).toFixed(1)} دقيقة)`);
+      return estimatedDuration;
+    }
+    
+    console.warn(`⚠️ [تقدير غير معقول] ${estimatedDuration.toFixed(1)} ثانية`);
+    return 0; // إرجاع 0 للمحاولة التالية
+  }
+
+  // حساب مدة احتياطية آمنة
+  calculateFallbackDuration(audioBlob) {
+    const sizeInKB = audioBlob.size / 1024;
+    
+    // تقدير محافظ: كل 100KB تقريباً = 10 ثواني للجودة المتوسطة
+    let estimatedDuration = (sizeInKB / 100) * 10;
+    
+    // حدود آمنة: بين 10 ثواني و 20 دقيقة
+    estimatedDuration = Math.max(10, Math.min(estimatedDuration, 1200));
+    
+    console.log(`🛡️ [تقدير احتياطي آمن] ${estimatedDuration.toFixed(1)} ثانية للملف ${sizeInKB.toFixed(0)}KB`);
+    return estimatedDuration;
+  }
+
+  // معالجة التسجيلات الطويلة - إصدار محسن مع حدود صارمة
   async processLongAudioWithRealSplitting(audioBlob, duration, onProgress = null) {
     console.log(`🚀 [بدء معالجة تسجيل طويل] المدة: ${duration.toFixed(1)} ثانية، الحجم: ${Math.round(audioBlob.size / 1024)}KB`);
+
+    // فحص صحة المدة أولاً - منع Infinity والقيم غير المعقولة
+    if (!duration || duration === Infinity || isNaN(duration) || duration <= 0) {
+      console.error(`❌ [مدة غير صالحة] المدة غير صالحة: ${duration}`);
+      throw new Error(`مدة التسجيل غير صالحة: ${duration}. لا يمكن معالجة التسجيل.`);
+    }
+
+    // حد أقصى صارم للمدة: 20 دقيقة (1200 ثانية)
+    const MAX_DURATION = 1200; // 20 دقيقة
+    if (duration > MAX_DURATION) {
+      const errorMsg = `التسجيل طويل جداً (${(duration/60).toFixed(1)} دقيقة). الحد الأقصى المسموح: ${MAX_DURATION/60} دقيقة`;
+      console.error(`❌ [تسجيل طويل جداً] ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
 
     // فحص حجم الملف قبل المعالجة
     if (audioBlob.size > this.memoryUsage.maxFileSize) {
@@ -224,6 +366,19 @@ class AlgerianAudioProcessor {
       console.error(`❌ [فحص الحجم] ${errorMsg}`);
       throw new Error(errorMsg);
     }
+
+    // حد أقصى لعدد المقاطع لمنع استنزاف الذاكرة
+    const maxChunkDuration = 25; // 25 ثانية لكل مقطع (بين 20-30 حسب التوصيات)
+    const estimatedChunks = Math.ceil(duration / maxChunkDuration);
+    const MAX_CHUNKS = 50; // حد أقصى 50 مقطع
+    
+    if (estimatedChunks > MAX_CHUNKS) {
+      const errorMsg = `عدد المقاطع المطلوبة كبير جداً (${estimatedChunks}). الحد الأقصى: ${MAX_CHUNKS} مقطع`;
+      console.error(`❌ [مقاطع كثيرة جداً] ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+
+    console.log(`✅ [فحص المتطلبات] التسجيل صالح: ${duration.toFixed(1)}s، ${estimatedChunks} مقطع متوقع`);
 
     try {
       // تقسيم الصوت إلى مقاطع 20-30 ثانية وفقاً للتوصيات
@@ -456,22 +611,45 @@ class AlgerianAudioProcessor {
     }
   }
 
-  // تقسيم محسن للصوت إلى مقاطع 20-30 ثانية وفقاً للتوصيات العاجلة
+  // تقسيم محسن مع حدود آمنة للذاكرة
   async splitAudioIntoOptimizedChunks(audioBlob, totalDuration) {
     console.log(`\n🔧 [بدء التقسيم المحسن] مدة التسجيل: ${totalDuration.toFixed(1)} ثانية، حجم الملف: ${Math.round(audioBlob.size / 1024)}KB`);
     
+    // فحص صحة المدة مرة أخرى
+    if (!totalDuration || totalDuration === Infinity || isNaN(totalDuration) || totalDuration <= 0) {
+      console.error(`❌ [مدة غير صالحة للتقسيم] ${totalDuration}`);
+      throw new Error(`لا يمكن تقسيم تسجيل بمدة غير صالحة: ${totalDuration}`);
+    }
+
     try {
-      // حساب الحجم الأمثل للمقاطع (20-30 ثانية حسب التوصيات)
-      let optimalChunkDuration = this.maxChunkDuration; // 30 ثانية افتراضياً
+      // حساب الحجم الأمثل للمقاطع (20-30 ثانية بدقة حسب التوصيات)
+      let optimalChunkDuration;
       
-      if (totalDuration > 120) { // للتسجيلات أطول من دقيقتين
-        optimalChunkDuration = 25; // مقاطع أصغر للتحكم الأفضل
-      } else if (totalDuration < 60) { // للتسجيلات أقل من دقيقة
-        optimalChunkDuration = 20; // مقاطع أصغر للدقة
+      if (totalDuration <= 30) {
+        // للتسجيلات القصيرة جداً: مقطع واحد
+        optimalChunkDuration = totalDuration;
+        console.log(`📝 [تسجيل قصير] مقطع واحد بطول ${optimalChunkDuration.toFixed(1)}s`);
+      } else if (totalDuration <= 60) {
+        // للتسجيلات أقل من دقيقة: مقاطع 20 ثانية
+        optimalChunkDuration = 20;
+      } else if (totalDuration <= 300) {
+        // للتسجيلات 1-5 دقائق: مقاطع 25 ثانية
+        optimalChunkDuration = 25;
+      } else {
+        // للتسجيلات الطويلة: مقاطع 30 ثانية
+        optimalChunkDuration = 30;
       }
       
       const numChunks = Math.ceil(totalDuration / optimalChunkDuration);
+      
+      // فحص عدد المقاطع
+      if (numChunks > 50) { // حد أقصى 50 مقطع
+        console.error(`❌ [مقاطع كثيرة] ${numChunks} مقطع يتجاوز الحد الأقصى (50)`);
+        throw new Error(`عدد المقاطع المطلوبة (${numChunks}) يتجاوز الحد الأقصى المسموح (50)`);
+      }
+      
       console.log(`📊 [استراتيجية التقسيم] ${numChunks} مقطع × ${optimalChunkDuration}s لكل مقطع`);
+      console.log(`📈 [كفاءة التقسيم] تغطية: ${((numChunks * optimalChunkDuration) / totalDuration * 100).toFixed(1)}%`);
 
       // فحص دعم Web Audio API
       if (!this.audioContext) {
@@ -491,22 +669,30 @@ class AlgerianAudioProcessor {
       const numberOfChannels = audioBuffer.numberOfChannels;
       let successfulChunks = 0;
 
-      // تطبيق حلقة التقسيم مع سجلات تفصيلية
+      // تطبيق حلقة التقسيم مع سجلات تفصيلية مطورة
+      console.log(`\n🔄 [بدء حلقة التقسيم] معالجة ${numChunks} مقطع`);
+      
       for (let i = 0; i < numChunks; i++) {
         const start = i * optimalChunkDuration;
         const end = Math.min((i + 1) * optimalChunkDuration, totalDuration);
         const chunkDuration = end - start;
         
-        console.log(`\n📦 [إنشاء المقطع ${i + 1}/${numChunks}] ${start.toFixed(1)}s → ${end.toFixed(1)}s (${chunkDuration.toFixed(1)}s)`);
+        console.log(`\n📦 [إنشاء المقطع ${i + 1}/${numChunks}] ⏰ ${start.toFixed(1)}s → ${end.toFixed(1)}s (مدة: ${chunkDuration.toFixed(1)}s)`);
         
         // حساب العينات الصوتية
         const startSample = Math.floor(start * sampleRate);
         const endSample = Math.floor(end * sampleRate);
         const chunkLength = endSample - startSample;
+        
+        console.log(`🔢 [عينات المقطع ${i + 1}] من عينة ${startSample} إلى ${endSample} (${chunkLength} عينة)`);
 
         if (chunkLength <= 0) {
           console.warn(`⚠️ [تحذير المقطع ${i + 1}] طول غير صالح: ${chunkLength} عينة، تجاهل`);
           continue;
+        }
+
+        if (chunkLength < sampleRate * 0.5) { // أقل من نصف ثانية
+          console.warn(`⚠️ [مقطع قصير جداً ${i + 1}] ${(chunkLength/sampleRate).toFixed(2)}s فقط، قد لا يحتوي على محتوى مفيد`);
         }
 
         try {
