@@ -6,10 +6,11 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export const useTrialPeriod = () => {
   const [trialStatus, setTrialStatus] = useState({
-    status: 'loading', // 'loading', 'active', 'expired'
+    status: 'loading', // 'loading', 'active', 'expired', 'error'
     remainingDays: 0,
     deviceId: null
   });
+
   const [isChecking, setIsChecking] = useState(true);
 
   // إنشاء أو استرجاع معرف الجهاز
@@ -22,68 +23,84 @@ export const useTrialPeriod = () => {
     return deviceId;
   };
 
-  // التحقق من حالة الفترة التجريبية
+  // التحقق محليًا من الفترة التجريبية
+  const checkLocalTrial = (deviceId) => {
+    const localTrialStart = localStorage.getItem('localTrialStart');
+
+    if (!localTrialStart) {
+      localStorage.setItem('localTrialStart', new Date().toISOString());
+      return {
+        status: 'active',
+        remainingDays: TRIAL_DURATION_DAYS,
+        deviceId
+      };
+    }
+
+    const startDate = new Date(localTrialStart);
+    const now = new Date();
+    const daysPassed = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
+    const remainingDays = Math.max(0, TRIAL_DURATION_DAYS - daysPassed);
+
+    return {
+      status: remainingDays > 0 ? 'active' : 'expired',
+      remainingDays,
+      deviceId
+    };
+  };
+
+  // التحقق من حالة الفترة التجريبية من الخادم أو fallback محلي
   const checkTrialStatus = async () => {
+    setIsChecking(true);
+    const deviceId = getOrCreateDeviceId();
+
     try {
-      const deviceId = getOrCreateDeviceId();
-      
+      console.log("🔗 طلب إلى:", `${API_BASE_URL}/check-trial`);
+
       const response = await fetch(`${API_BASE_URL}/check-trial`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ deviceId })
       });
 
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
+      if (!response.ok) throw new Error("Network response was not ok");
 
       const data = await response.json();
-      
+
       setTrialStatus({
         status: data.status,
         remainingDays: data.remaining_days || 0,
-        deviceId: deviceId
+        deviceId
       });
 
-      // إخفاء رسالة التحقق بعد اكتمال الاستجابة
-      setIsChecking(false);
-
     } catch (error) {
-      console.error('خطأ في التحقق من الفترة التجريبية:', error);
-      
-      // في حالة فشل الاتصال، نعتبر الفترة نشطة محلياً
-      const deviceId = getOrCreateDeviceId();
-      const localTrialStart = localStorage.getItem('localTrialStart');
-      
-      if (!localTrialStart) {
-        localStorage.setItem('localTrialStart', new Date().toISOString());
-        setTrialStatus({
-          status: 'active',
-          remainingDays: TRIAL_DURATION_DAYS,
-          deviceId: deviceId
-        });
-      } else {
-        const startDate = new Date(localTrialStart);
-        const now = new Date();
-        const daysPassed = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
-        const remainingDays = Math.max(0, TRIAL_DURATION_DAYS - daysPassed);
-        
-        setTrialStatus({
-          status: remainingDays > 0 ? 'active' : 'expired',
-          remainingDays: remainingDays,
-          deviceId: deviceId
-        });
-      }
-      
-      // إخفاء رسالة التحقق حتى في حالة الفشل
+      console.warn("⚠️ فشل الاتصال بالخادم، استخدام التحقق المحلي:", error);
+
+      const localStatus = checkLocalTrial(deviceId);
+      setTrialStatus(localStatus);
+    } finally {
       setIsChecking(false);
     }
   };
 
+  // تحديث تلقائي يوميًا
   useEffect(() => {
     checkTrialStatus();
+
+    const interval = setInterval(() => {
+      setTrialStatus(prev => {
+        if (prev.status === 'active' && prev.remainingDays > 0) {
+          const newRemaining = prev.remainingDays - 1;
+          return {
+            ...prev,
+            remainingDays: newRemaining,
+            status: newRemaining > 0 ? 'active' : 'expired'
+          };
+        }
+        return prev;
+      });
+    }, 24 * 60 * 60 * 1000); // تحديث كل 24 ساعة
+
+    return () => clearInterval(interval);
   }, []);
 
   return {
