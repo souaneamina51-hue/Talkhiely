@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 
 const TRIAL_DURATION_DAYS = 7;
-const API_BASE_URL = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:5000/api`;
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export const useTrialPeriod = () => {
   const [trialStatus, setTrialStatus] = useState({

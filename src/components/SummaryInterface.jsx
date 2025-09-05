@@ -31,7 +31,6 @@ const SummaryInterface = ({ trialStatus }) => {
   const [summary, setSummary] = useState('');
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaries, setSummaries] = useState([]);
-  const [isChecking, setIsChecking] = useState(true);
 
   const {
     status,
@@ -42,46 +41,6 @@ const SummaryInterface = ({ trialStatus }) => {
 
   const cardBg = useColorModeValue('white', 'gray.800');
   const mainBg = useColorModeValue('gray.50', 'gray.900');
-
-  // دالة للحصول على أو إنشاء معرف الجهاز
-  const getOrCreateDeviceId = () => {
-    let deviceId = localStorage.getItem('deviceId');
-    if (!deviceId) {
-      deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).substring(2);
-      localStorage.setItem('deviceId', deviceId);
-    }
-    return deviceId;
-  };
-
-  // التحقق من الفترة التجريبية عند تحميل المكون
-  useEffect(() => {
-    const checkTrialStatus = async () => {
-      try {
-        const deviceId = getOrCreateDeviceId();
-        
-        const response = await fetch('/api/check-trial', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ deviceId }),
-        });
-
-        const data = await response.json();
-        console.log('استجابة التحقق من الفترة التجريبية:', data);
-        
-        // تحديث حالة isChecking إلى false بعد تلقي الاستجابة
-        setIsChecking(false);
-        
-      } catch (error) {
-        console.error('خطأ في التحقق من الفترة التجريبية:', error);
-        // تحديث حالة isChecking إلى false حتى في حالة الخطأ
-        setIsChecking(false);
-      }
-    };
-
-    checkTrialStatus();
-  }, []);
 
   // Timer functionality
   useEffect(() => {
@@ -318,22 +277,6 @@ ${summary.transcribedText}
   const handleUpgrade = () => {
     alert('ميزة الترقية ستكون متاحة قريباً!');
   };
-
-  // عرض شاشة التحميل أثناء التحقق من الفترة التجريبية
-  if (isChecking) {
-    return (
-      <Box bg={mainBg} minH="100vh" display="flex" alignItems="center" justifyContent="center">
-        <Container textAlign="center">
-          <VStack spacing={4}>
-            <Progress size="lg" isIndeterminate colorScheme="blue" w="300px" />
-            <Text fontSize="lg" color="gray.600">
-              جاري التحقق من الحساب...
-            </Text>
-          </VStack>
-        </Container>
-      </Box>
-    );
-  }
 
   return (
     <Box bg={mainBg} minH="100vh" py={8}>
