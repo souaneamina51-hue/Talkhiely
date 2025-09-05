@@ -155,38 +155,13 @@ class AlgerianAudioProcessor {
     }
   }
 
-  // الحصول على مدة الصوت الدقيقة مع إصلاح مشكلة Infinity
+  // الحصول على مدة الصوت الموثوقة باستخدام الطريقة المحسنة
   async getAccurateAudioDuration(audioBlob) {
     console.log(`🔍 [حساب المدة] بدء حساب مدة التسجيل، حجم الملف: ${Math.round(audioBlob.size / 1024)}KB`);
     
-    // الطريقة الأولى: Web Audio API (الأكثر دقة)
-    try {
-      if (this.audioContext) {
-        console.log(`⚙️ [Web Audio API] محاولة فك تشفير الملف`);
-        const arrayBuffer = await audioBlob.arrayBuffer();
-        const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-        const duration = audioBuffer.duration;
-        
-        if (duration && duration !== Infinity && !isNaN(duration) && duration > 0) {
-          console.log(`✅ [Web Audio API] مدة دقيقة: ${duration.toFixed(2)} ثانية`);
-          return duration;
-        } else {
-          console.warn(`⚠️ [Web Audio API] مدة غير صالحة: ${duration}`);
-        }
-      }
-    } catch (error) {
-      console.warn(`❌ [Web Audio API] فشل:`, error.message);
-    }
-
-    // الطريقة الثانية: تقدير دقيق حسب نوع الملف وحجمه
-    const estimatedDuration = this.estimateDurationFromFileProperties(audioBlob);
-    if (estimatedDuration > 0) {
-      console.log(`📊 [تقدير ذكي] مدة مقدرة: ${estimatedDuration.toFixed(2)} ثانية`);
-      return estimatedDuration;
-    }
-
-    // الطريقة الثالثة: HTML Audio مع معالجة شاملة لمشكلة Infinity
-    console.log(`🎵 [HTML Audio] محاولة HTML Audio كطريقة احتياطية`);
+    // الطريقة الموثوقة الأولى: HTML Audio مع loadedmetadata (حسب التوصيات)
+    console.log(`🎵 [HTML Audio] استخدام الطريقة الموثوقة للحصول على المدة`);
+    
     return new Promise((resolve) => {
       let resolved = false;
       
@@ -198,98 +173,119 @@ class AlgerianAudioProcessor {
       };
 
       try {
-        const audio = new Audio(URL.createObjectURL(audioBlob));
+        const audio = new Audio();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        audio.src = audioUrl;
         
-        // تعيين خصائص مهمة
+        // تعيين خصائص مهمة للحصول على مدة دقيقة
         audio.preload = 'metadata';
-        audio.volume = 0; // صامت لتجنب التشغيل غير المرغوب
+        audio.volume = 0;
         
-        let attemptCount = 0;
-        const maxAttempts = 5;
-
-        const checkDuration = () => {
-          attemptCount++;
-          console.log(`🔍 [فحص ${attemptCount}/${maxAttempts}] duration: ${audio.duration}, readyState: ${audio.readyState}`);
-          
-          if (audio.duration && audio.duration !== Infinity && !isNaN(audio.duration)) {
-            cleanup();
-            safeResolve(audio.duration, `HTML Audio - محاولة ${attemptCount}`);
-            return true;
-          }
-          
-          if (attemptCount >= maxAttempts) {
-            console.warn(`⚠️ [HTML Audio] فشل بعد ${maxAttempts} محاولات`);
-            cleanup();
-            // استخدام تقدير ذكي بناءً على حجم الملف
-            const fallbackDuration = this.calculateFallbackDuration(audioBlob);
-            safeResolve(fallbackDuration, 'تقدير احتياطي');
-            return true;
-          }
-          
-          return false;
-        };
-
-        const handleLoadedMetadata = () => {
-          console.log(`📊 [loadedmetadata] تم تحميل البيانات الوصفية`);
-          if (!checkDuration()) {
-            // إذا لم تنجح، انتظر قليلاً وحاول مرة أخرى
-            setTimeout(checkDuration, 500);
-          }
-        };
-
-        const handleCanPlay = () => {
-          console.log(`🎼 [canplay] الصوت جاهز للتشغيل`);
-          if (!checkDuration()) {
-            setTimeout(checkDuration, 300);
-          }
-        };
-
-        const handleError = (error) => {
-          console.error(`❌ [HTML Audio Error]`, error);
-          cleanup();
-          const fallbackDuration = this.calculateFallbackDuration(audioBlob);
-          safeResolve(fallbackDuration, 'خطأ - تقدير احتياطي');
-        };
-
+        console.log(`📥 [تحميل الصوت] بدء تحميل البيانات الوصفية`);
+        
         const cleanup = () => {
           try {
-            audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-            audio.removeEventListener('canplay', handleCanPlay);
-            audio.removeEventListener('error', handleError);
             if (audio.src && audio.src.startsWith('blob:')) {
               URL.revokeObjectURL(audio.src);
             }
             audio.src = '';
           } catch (e) {
-            console.warn(`⚠️ [تنظيف HTML Audio] خطأ في التنظيف:`, e.message);
+            console.warn(`⚠️ [تنظيف] خطأ في التنظيف:`, e.message);
           }
         };
 
-        // إضافة المستمعات
-        audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-        audio.addEventListener('canplay', handleCanPlay);
-        audio.addEventListener('error', handleError);
+        // المستمع الرئيسي للحصول على مدة دقيقة
+        audio.addEventListener('loadedmetadata', () => {
+          console.log(`📊 [loadedmetadata] تم تحميل البيانات الوصفية`);
+          console.log(`🔍 [فحص المدة] duration: ${audio.duration}, readyState: ${audio.readyState}`);
+          
+          // التحقق من صحة المدة
+          if (audio.duration && audio.duration !== Infinity && !isNaN(audio.duration) && audio.duration > 0) {
+            console.log(`🎯 [مدة صحيحة] المدة: ${audio.duration.toFixed(2)} ثانية`);
+            cleanup();
+            safeResolve(audio.duration, 'HTML Audio - loadedmetadata');
+          } else {
+            console.warn(`⚠️ [مدة غير صالحة] duration: ${audio.duration}`);
+            // محاولة الانتظار قليلاً في حالة التحميل البطيء
+            setTimeout(() => {
+              if (audio.duration && audio.duration !== Infinity && !isNaN(audio.duration) && audio.duration > 0) {
+                cleanup();
+                safeResolve(audio.duration, 'HTML Audio - تأخير');
+              } else {
+                console.warn(`⚠️ [فشل نهائي HTML Audio] استخدام التقدير الذكي`);
+                cleanup();
+                const estimatedDuration = this.calculateReliableDuration(audioBlob);
+                safeResolve(estimatedDuration, 'تقدير ذكي');
+              }
+            }, 1000);
+          }
+        });
 
-        // timeout نهائي للحماية من التعليق
+        // معالج الأخطاء
+        audio.addEventListener('error', (error) => {
+          console.error(`❌ [HTML Audio Error]`, error);
+          cleanup();
+          const fallbackDuration = this.calculateReliableDuration(audioBlob);
+          safeResolve(fallbackDuration, 'خطأ - تقدير احتياطي');
+        });
+
+        // حماية من التعليق
         setTimeout(() => {
           if (!resolved) {
-            console.warn(`⏰ [انتهاء المهلة] انتهت مهلة 8 ثواني`);
+            console.warn(`⏰ [انتهاء المهلة] انتهت مهلة 6 ثواني، استخدام التقدير`);
             cleanup();
-            const fallbackDuration = this.calculateFallbackDuration(audioBlob);
+            const fallbackDuration = this.calculateReliableDuration(audioBlob);
             safeResolve(fallbackDuration, 'انتهاء المهلة - تقدير احتياطي');
           }
-        }, 8000);
+        }, 6000);
 
-        // بدء التحميل
-        console.log(`📥 [بدء التحميل] تحميل البيانات الوصفية`);
+        // بدء تحميل البيانات الوصفية
         audio.load();
 
       } catch (error) {
-        console.error(`💥 [HTML Audio Exception]`, error);
-        const fallbackDuration = this.calculateFallbackDuration(audioBlob);
+        console.error(`💥 [استثناء HTML Audio]`, error);
+        const fallbackDuration = this.calculateReliableDuration(audioBlob);
         safeResolve(fallbackDuration, 'استثناء - تقدير احتياطي');
       }
     });
+  }
+
+  // حساب مدة موثوقة بناءً على خصائص الملف (طريقة محسنة)
+  calculateReliableDuration(audioBlob) {
+    console.log(`🧮 [تقدير موثوق] تحليل خصائص الملف للتقدير`);
+    
+    const sizeInMB = audioBlob.size / (1024 * 1024);
+    const fileType = audioBlob.type.toLowerCase();
+    
+    console.log(`📊 [خصائص] حجم: ${sizeInMB.toFixed(2)}MB، نوع: ${fileType}`);
+    
+    // معدلات تقديرية محسنة حسب نوع الملف
+    let estimatedMinutes = 0;
+    
+    if (fileType.includes('wav')) {
+      // WAV غير مضغوط: حوالي 10MB لكل دقيقة بجودة عادية
+      estimatedMinutes = sizeInMB / 10;
+    } else if (fileType.includes('mp3')) {
+      // MP3 بمعدل 128kbps: حوالي 1MB لكل دقيقة
+      estimatedMinutes = sizeInMB / 1;
+    } else if (fileType.includes('m4a') || fileType.includes('aac')) {
+      // AAC مضغوط: حوالي 1.2MB لكل دقيقة
+      estimatedMinutes = sizeInMB / 1.2;
+    } else if (fileType.includes('webm')) {
+      // WebM من المتصفح: عادة مضغوط جيداً
+      estimatedMinutes = sizeInMB / 0.8;
+    } else {
+      // تقدير عام محافظ
+      estimatedMinutes = sizeInMB / 2;
+    }
+    
+    const estimatedSeconds = estimatedMinutes * 60;
+    
+    // تطبيق حدود منطقية
+    const finalDuration = Math.max(5, Math.min(estimatedSeconds, 3600)); // بين 5 ثواني و ساعة
+    
+    console.log(`🎯 [تقدير نهائي] ${finalDuration.toFixed(1)} ثانية (${(finalDuration/60).toFixed(1)} دقيقة)`);
+    return finalDuration;
   }
 
   // تقدير المدة بناءً على خصائص الملف
@@ -342,181 +338,222 @@ class AlgerianAudioProcessor {
     return estimatedDuration;
   }
 
-  // معالجة التسجيلات الطويلة - إصدار محسن مع حدود صارمة
+  // معالجة التسجيلات الطويلة مع تطبيق التوصيات المحدثة
   async processLongAudioWithRealSplitting(audioBlob, duration, onProgress = null) {
     console.log(`🚀 [بدء معالجة تسجيل طويل] المدة: ${duration.toFixed(1)} ثانية، الحجم: ${Math.round(audioBlob.size / 1024)}KB`);
 
-    // فحص صحة المدة أولاً - منع Infinity والقيم غير المعقولة
+    // فحص صحة المدة مع التوصيات الجديدة
     if (!duration || duration === Infinity || isNaN(duration) || duration <= 0) {
       console.error(`❌ [مدة غير صالحة] المدة غير صالحة: ${duration}`);
-      throw new Error(`مدة التسجيل غير صالحة: ${duration}. لا يمكن معالجة التسجيل.`);
+      throw new Error(`مدة التسجيل غير صالحة: ${duration}. استخدم الطريقة الموثوقة للحصول على المدة.`);
     }
 
-    // حد أقصى صارم للمدة: 20 دقيقة (1200 ثانية)
-    const MAX_DURATION = 1200; // 20 دقيقة
+    // حدود محسنة للمدة: 15 دقيقة (900 ثانية)
+    const MAX_DURATION = 900;
     if (duration > MAX_DURATION) {
       const errorMsg = `التسجيل طويل جداً (${(duration/60).toFixed(1)} دقيقة). الحد الأقصى المسموح: ${MAX_DURATION/60} دقيقة`;
       console.error(`❌ [تسجيل طويل جداً] ${errorMsg}`);
       throw new Error(errorMsg);
     }
 
-    // فحص حجم الملف قبل المعالجة
-    if (audioBlob.size > this.memoryUsage.maxFileSize) {
-      const errorMsg = `الملف كبير جداً (${Math.round(audioBlob.size / 1024 / 1024)}MB). الحد الأقصى المسموح: ${Math.round(this.memoryUsage.maxFileSize / 1024 / 1024)}MB`;
-      console.error(`❌ [فحص الحجم] ${errorMsg}`);
-      throw new Error(errorMsg);
-    }
+    // تطبيق التوصيات: مقاطع 20-30 ثانية
+    const OPTIMAL_CHUNK_DURATION = duration <= 60 ? 20 : (duration <= 300 ? 25 : 30);
+    console.log(`⚙️ [إعدادات التقسيم] مدة المقطع المثلى: ${OPTIMAL_CHUNK_DURATION} ثانية`);
 
-    // حد أقصى لعدد المقاطع لمنع استنزاف الذاكرة
-    const maxChunkDuration = 25; // 25 ثانية لكل مقطع (بين 20-30 حسب التوصيات)
-    const estimatedChunks = Math.ceil(duration / maxChunkDuration);
-    const MAX_CHUNKS = 50; // حد أقصى 50 مقطع
+    const estimatedChunks = Math.ceil(duration / OPTIMAL_CHUNK_DURATION);
+    const MAX_CHUNKS = 30; // مخفض لتحسين الأداء
     
     if (estimatedChunks > MAX_CHUNKS) {
-      const errorMsg = `عدد المقاطع المطلوبة كبير جداً (${estimatedChunks}). الحد الأقصى: ${MAX_CHUNKS} مقطع`;
-      console.error(`❌ [مقاطع كثيرة جداً] ${errorMsg}`);
+      const errorMsg = `عدد المقاطع كثير (${estimatedChunks}). الحد الأقصى: ${MAX_CHUNKS}`;
+      console.error(`❌ [مقاطع كثيرة] ${errorMsg}`);
       throw new Error(errorMsg);
     }
 
-    console.log(`✅ [فحص المتطلبات] التسجيل صالح: ${duration.toFixed(1)}s، ${estimatedChunks} مقطع متوقع`);
+    console.log(`✅ [فحص اجتاز] مدة صحيحة: ${duration.toFixed(1)}s، عدد المقاطع المتوقع: ${estimatedChunks}`);
 
     try {
-      // تقسيم الصوت إلى مقاطع 20-30 ثانية وفقاً للتوصيات
-      console.log(`🔧 [بدء التقسيم] تقسيم إلى مقاطع من ${this.maxChunkDuration} ثانية`);
-      const chunks = await this.splitAudioIntoOptimizedChunks(audioBlob, duration);
-      console.log(`📦 [نتيجة التقسيم] تم إنشاء ${chunks.length} مقطع فعلي`);
+      // الخطوة 1: تقسيم التسجيل قبل المعالجة (حسب التوصيات)
+      console.log(`\n📋 [الخطوة 1/4] تقسيم التسجيل إلى مقاطع ${OPTIMAL_CHUNK_DURATION}s`);
+      if (onProgress) {
+        onProgress({
+          current: 10,
+          total: 100,
+          stage: 'splitting',
+          message: `تقسيم التسجيل إلى ${estimatedChunks} مقطع...`
+        });
+      }
 
-      // متغير لتجميع النص النهائي
+      const chunks = await this.createOptimalChunks(audioBlob, duration, OPTIMAL_CHUNK_DURATION);
+      console.log(`✅ [تم التقسيم] أُنشأ ${chunks.length} مقطع فعلي`);
+
+      // الخطوة 2: معالجة المقاطع بالتتابع (تجنب حفظ التسجيل الكامل في الذاكرة)
+      console.log(`\n🔄 [الخطوة 2/4] معالجة المقاطع بالتتابع`);
       let finalText = "";
       let successfulChunks = 0;
       let failedChunks = 0;
-      this.memoryUsage.currentChunks = chunks.length;
 
-      // معالجة المقاطع بمجموعات صغيرة وفقاً للتوصيات (تجنب المعالجة الطويلة في حلقة واحدة)
-      const batchSize = 3; // معالجة 3 مقاطع في كل دفعة
-      const totalBatches = Math.ceil(chunks.length / batchSize);
+      // معالجة متسلسلة مع رسائل console لكل خطوة
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const chunkNumber = i + 1;
 
-      console.log(`🎯 [استراتيجية المعالجة] سيتم معالجة ${chunks.length} مقطع في ${totalBatches} دفعة، ${batchSize} مقاطع في كل دفعة`);
-
-      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
-        const batchStart = batchIndex * batchSize;
-        const batchEnd = Math.min(batchStart + batchSize, chunks.length);
-        const currentBatchChunks = chunks.slice(batchStart, batchEnd);
-
-        console.log(`\n🔄 [بدء الدفعة ${batchIndex + 1}/${totalBatches}] معالجة المقاطع ${batchStart + 1}-${batchEnd}`);
-
-        // معالجة متوازية للمقاطع في الدفعة الواحدة مع Promise.allSettled
-        const batchResults = await Promise.allSettled(
-          currentBatchChunks.map(async (chunk, localIndex) => {
-            const globalIndex = batchStart + localIndex;
-            return await this.processChunkWithDetailedLogging(chunk, globalIndex + 1, chunks.length);
-          })
-        );
-
-        // معالجة نتائج الدفعة
-        console.log(`📊 [نتائج الدفعة ${batchIndex + 1}] معالجة ${batchResults.length} مقاطع:`);
-        
-        batchResults.forEach((result, localIndex) => {
-          const globalIndex = batchStart + localIndex;
-          const chunkNumber = globalIndex + 1;
-
-          if (result.status === 'fulfilled' && result.value) {
-            const chunkText = result.value.trim();
-            if (chunkText.length > 3) {
-              finalText += chunkText + " ";
-              successfulChunks++;
-              console.log(`✅ [نجح المقطع ${chunkNumber}] "${chunkText.substring(0, 50)}..." (${chunkText.length} حرف)`);
-            } else {
-              failedChunks++;
-              console.warn(`⚠️ [المقطع ${chunkNumber} فارغ] لم يُستخرج نص كافي`);
-            }
-          } else {
-            failedChunks++;
-            const errorMessage = result.reason?.message || 'خطأ غير محدد';
-            console.error(`❌ [فشل المقطع ${chunkNumber}] ${errorMessage}`);
-          }
+        console.log(`\n🎤 [بدء المقطع ${chunkNumber}/${chunks.length}]`, {
+          مدة: `${chunk.duration?.toFixed(1)}s`,
+          حجم: `${Math.round((chunk.blob?.size || 0) / 1024)}KB`,
+          وقت_البداية: `${chunk.startTime?.toFixed(1)}s`,
+          وقت_النهاية: `${chunk.endTime?.toFixed(1)}s`
         });
 
-        // تحديث شريط التقدم
+        try {
+          // معالجة المقطع مع حد زمني
+          const chunkStartTime = Date.now();
+          const chunkText = await this.processChunkWithTimeout(chunk, chunkNumber, 25000); // 25 ثانية لكل مقطع
+          const processingTime = ((Date.now() - chunkStartTime) / 1000).toFixed(1);
+
+          if (chunkText && chunkText.trim().length > 2) {
+            finalText += chunkText.trim() + " ";
+            successfulChunks++;
+            console.log(`✅ [نجح المقطع ${chunkNumber}] "${chunkText.substring(0, 60)}..." (${chunkText.length} حرف في ${processingTime}s)`);
+          } else {
+            failedChunks++;
+            console.warn(`⚠️ [المقطع ${chunkNumber} فارغ] لا يحتوي على نص كافي (${processingTime}s)`);
+          }
+
+        } catch (chunkError) {
+          failedChunks++;
+          console.error(`❌ [فشل المقطع ${chunkNumber}] ${chunkError.message}`);
+        } finally {
+          // تحرير المقطع من الذاكرة فوراً (حسب التوصيات)
+          if (chunk.blob) {
+            chunk.blob = null;
+            console.log(`🧹 [تنظيف المقطع ${chunkNumber}] تم حذف المقطع من الذاكرة`);
+          }
+          chunks[i] = null;
+        }
+
+        // تحديث التقدم
         if (onProgress) {
-          const progressPercent = ((batchIndex + 1) / totalBatches) * 100;
+          const progress = 20 + ((i + 1) / chunks.length) * 60; // 20% إلى 80%
           onProgress({
-            current: batchIndex + 1,
-            total: totalBatches,
+            current: Math.round(progress),
+            total: 100,
             stage: 'processing',
-            message: `معالجة الدفعة ${batchIndex + 1}/${totalBatches} - نجح: ${successfulChunks}, فشل: ${failedChunks}`,
-            memoryInfo: `الذاكرة: ${this.getMemoryUsageInfo()}`
+            message: `معالجة المقاطع (${chunkNumber}/${chunks.length}) - نجح: ${successfulChunks}، فشل: ${failedChunks}`
           });
         }
 
-        // تنظيف فوري للمقاطع المعالجة في هذه الدفعة
-        console.log(`🧹 [تنظيف الدفعة ${batchIndex + 1}] تحرير ذاكرة ${currentBatchChunks.length} مقاطع`);
-        currentBatchChunks.forEach((chunk, localIndex) => {
-          const globalIndex = batchStart + localIndex;
-          if (chunk.blob) {
-            chunk.blob = null;
-          }
-          chunks[globalIndex] = null;
-        });
-
-        // تنظيف دوري للذاكرة بعد كل دفعة
-        this.cleanupMemory();
-        
-        // توقف بين الدفعات لتجنب إرهاق النظام
-        if (batchIndex < totalBatches - 1) {
-          console.log(`⏸️ [استراحة] توقف 2 ثانية بين الدفعات`);
-          await new Promise(resolve => setTimeout(resolve, 2000));
+        // توقف قصير كل 3 مقاطع لتجنب إرهاق النظام
+        if (chunkNumber % 3 === 0 && chunkNumber < chunks.length) {
+          console.log(`⏸️ [استراحة] توقف قصير بعد ${chunkNumber} مقاطع`);
+          await new Promise(resolve => setTimeout(resolve, 1500));
         }
       }
 
-      // تنظيف المصفوفة نهائياً
+      // تنظيف مصفوفة المقاطع نهائياً
       chunks.length = 0;
 
-      console.log(`\n📈 [ملخص المعالجة] النتائج النهائية:`);
+      // الخطوة 3: فحص النتائج
+      console.log(`\n📊 [الخطوة 3/4] فحص النتائج النهائية`);
       console.log(`   ✅ مقاطع ناجحة: ${successfulChunks}`);
       console.log(`   ❌ مقاطع فاشلة: ${failedChunks}`);
-      console.log(`   📝 طول النص النهائي: ${finalText.length} حرف`);
-      console.log(`   🎯 معدل النجاح: ${((successfulChunks / chunks.length) * 100).toFixed(1)}%`);
+      console.log(`   📄 طول النص الخام: ${finalText.length} حرف`);
+      console.log(`   🎯 معدل النجاح: ${((successfulChunks / estimatedChunks) * 100).toFixed(1)}%`);
 
-      // التحقق من النص النهائي
-      if (!finalText || finalText.trim().length < 15) {
-        const errorMsg = `فشل في استخراج نص كافي. نجح ${successfulChunks}/${this.memoryUsage.currentChunks} مقطع فقط. النص الحالي: ${finalText.length} حرف`;
+      if (!finalText || finalText.trim().length < 20) {
+        const errorMsg = `فشل في استخراج نص كافي. نجح ${successfulChunks}/${estimatedChunks} مقطع فقط`;
         console.error(`❌ [فشل نهائي] ${errorMsg}`);
         throw new Error(errorMsg);
       }
 
-      console.log(`✅ [النص جاهز للتلخيص] ${finalText.length} حرف من ${successfulChunks} مقطع ناجح`);
-
+      // الخطوة 4: دمج النصوص النهائية (حسب التوصيات)
+      console.log(`\n🔗 [الخطوة 4/4] دمج النصوص النهائية`);
       if (onProgress) {
         onProgress({
           current: 85,
           total: 100,
           stage: 'merging',
-          message: 'دمج وتنظيف النص النهائي...'
+          message: 'دمج وتنظيف النصوص النهائية...'
         });
       }
 
-      // تحسين النص النهائي
-      console.log(`🔧 [بدء تنظيف النص] تحسين النص النهائي`);
-      const enhancedText = this.finalTextCleanup(finalText.trim());
-      console.log(`✨ [انتهى التنظيف] النص المحسن جاهز: ${enhancedText.length} حرف`);
+      const cleanedText = this.finalTextCleanup(finalText.trim());
+      console.log(`✨ [دمج مكتمل] النص النهائي: ${cleanedText.length} حرف`);
+      console.log(`📝 [عينة النص] "${cleanedText.substring(0, 100)}..."`);
       
       // تنظيف نهائي للذاكرة
-      console.log(`🧹 [تنظيف نهائي] تحرير جميع الموارد`);
       this.cleanupMemory();
       
-      return enhancedText;
+      return cleanedText;
 
     } catch (error) {
-      console.error(`💥 [خطأ كارثي في معالجة التسجيل الطويل]`, {
-        message: error.message,
-        stack: error.stack,
-        duration: duration,
-        fileSize: audioBlob.size
+      console.error(`💥 [خطأ في معالجة التسجيل الطويل]`, {
+        خطأ: error.message,
+        المدة: duration,
+        حجم_الملف: audioBlob.size
       });
       this.cleanupMemory();
       throw error;
     }
+  }
+
+  // إنشاء مقاطع محسنة حسب التوصيات
+  async createOptimalChunks(audioBlob, totalDuration, chunkDuration) {
+    console.log(`📦 [إنشاء مقاطع] مدة كل مقطع: ${chunkDuration}s من إجمالي ${totalDuration.toFixed(1)}s`);
+    
+    const numberOfChunks = Math.ceil(totalDuration / chunkDuration);
+    const chunks = [];
+    const bytesPerSecond = audioBlob.size / totalDuration;
+    
+    console.log(`📊 [معاملات التقسيم] ${numberOfChunks} مقطع، ${Math.round(bytesPerSecond)} بايت/ثانية`);
+
+    for (let i = 0; i < numberOfChunks; i++) {
+      const startTime = i * chunkDuration;
+      const endTime = Math.min((i + 1) * chunkDuration, totalDuration);
+      const actualDuration = endTime - startTime;
+      
+      try {
+        // حساب موقع البايتات بدقة
+        const startByte = Math.floor(startTime * bytesPerSecond);
+        const endByte = Math.min(Math.floor(endTime * bytesPerSecond), audioBlob.size);
+        
+        // تقطيع الملف
+        const chunkBlob = audioBlob.slice(startByte, endByte, audioBlob.type);
+        
+        if (chunkBlob && chunkBlob.size > 500) { // حد أدنى للحجم
+          chunks.push({
+            blob: chunkBlob,
+            startTime: startTime,
+            endTime: endTime,
+            duration: actualDuration,
+            index: i,
+            size: chunkBlob.size
+          });
+          
+          console.log(`📦 [مقطع ${i + 1}] ${startTime.toFixed(1)}s-${endTime.toFixed(1)}s (${Math.round(chunkBlob.size/1024)}KB)`);
+        } else {
+          console.warn(`⚠️ [مقطع ${i + 1} مرفوض] حجم صغير: ${chunkBlob ? chunkBlob.size : 0} بايت`);
+        }
+        
+      } catch (sliceError) {
+        console.error(`❌ [خطأ تقطيع المقطع ${i + 1}] ${sliceError.message}`);
+      }
+    }
+    
+    console.log(`✅ [إنشاء المقاطع مكتمل] ${chunks.length} مقطع صالح من ${numberOfChunks} محاولة`);
+    return chunks;
+  }
+
+  // معالجة مقطع مع حد زمني
+  async processChunkWithTimeout(chunk, chunkNumber, timeoutMs = 25000) {
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`انتهت المهلة للمقطع ${chunkNumber} (${timeoutMs/1000}s)`));
+      }, timeoutMs);
+    });
+
+    const transcriptionPromise = this.transcribeAudioBlobDirectly(chunk.blob);
+    
+    return Promise.race([transcriptionPromise, timeoutPromise]);
   }
 
   // دالة معالجة المقاطع مع سجلات تفصيلية وفقاً للتوصيات العاجلة
