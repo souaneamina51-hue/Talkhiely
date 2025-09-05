@@ -67,7 +67,11 @@ app.use(express.static(path.join(__dirname, 'dist')));
 // 7. المسار الشامل (Catch-all Route) لتوجيه الطلبات
 // **ملاحظة: هذا المسار يجب أن يكون آخر مسار في الملف لتجنب الأخطاء**
 // أي Route غير موجود يوجّه لـ index.html (عشان React Router يشتغل)
-app.get(/^(?!\/api).*$/, (req, res) => {
+app.get('*', (req, res) => {
+  // تأكد من أن الطلب ليس لـ API
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ error: 'API endpoint not found' });
+  }
   res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
