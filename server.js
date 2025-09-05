@@ -1,140 +1,71 @@
 
-import express from 'express';
-import cors from 'cors';
-import { promises as fs } from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+// server.js
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// 1. استيراد المكتبات اللازمة
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
 
+// 2. إعداد التطبيق والمنفذ
 const app = express();
+// استخدام متغير البيئة PORT الخاص بـ Replit أو استخدام 5000 كقيمة افتراضية
 const PORT = process.env.PORT || 5000;
-const TRIAL_DURATION_DAYS = 7;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// 3. تفعيل الـ Middleware
+app.use(cors()); // لتجنب مشاكل CORS
+app.use(express.json()); // لاستقبال بيانات JSON من الواجهة الأمامية
 
-// مسار ملف قاعدة البيانات المؤقتة
-const DB_PATH = path.join(__dirname, 'trials.json');
+// 4. قاعدة بيانات مؤقتة للفترات التجريبية
+const trialDatabase = new Map();
+const TRIAL_DAYS = 7;
 
-// قراءة قاعدة البيانات
-async function readDatabase() {
-  try {
-    const data = await fs.readFile(DB_PATH, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    // إنشاء ملف جديد إذا لم يكن موجوداً
-    return {};
+// دالة لمقارنة التواريخ
+const isTrialExpired = (startDate) => {
+  const trialEnd = new Date(startDate);
+  trialEnd.setDate(trialEnd.getDate() + TRIAL_DAYS);
+  return new Date() > trialEnd;
+};
+
+// 5. نقطة النهاية (Endpoint) للتحقق من الفترة التجريبية
+app.post('/api/check-trial', (req, res) => {
+  const { deviceId } = req.body;
+
+  if (!deviceId) {
+    return res.status(400).json({ status: 'error', message: 'معرّف الجهاز مطلوب.' });
   }
-}
 
-// كتابة قاعدة البيانات
-async function writeDatabase(data) {
-  try {
-    await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2));
-  } catch (error) {
-    console.error('خطأ في كتابة قاعدة البيانات:', error);
-  }
-}
-
-// نقطة نهاية للتحقق من الفترة التجريبية
-app.post('/api/check-trial', async (req, res) => {
-  try {
-    const { deviceId } = req.body;
-
-    if (!deviceId) {
-      return res.status(400).json({ 
-        error: 'معرف الجهاز مطلوب',
-        status: 'error'
-      });
-    }
-
-    const database = await readDatabase();
-    const now = new Date();
-
-    // التحقق من وجود الجهاز في قاعدة البيانات
-    if (database[deviceId]) {
-      const trialStartDate = new Date(database[deviceId].trial_start_date);
-      const daysPassed = Math.floor((now - trialStartDate) / (1000 * 60 * 60 * 24));
-      const remainingDays = Math.max(0, TRIAL_DURATION_DAYS - daysPassed);
-
-      // تحديث حالة الفترة التجريبية
-      database[deviceId].last_access = now.toISOString();
-      database[deviceId].status = remainingDays > 0 ? 'active' : 'expired';
-
-      await writeDatabase(database);
-
-      return res.json({
-        status: database[deviceId].status,
-        remaining_days: remainingDays,
-        trial_start_date: database[deviceId].trial_start_date,
-        message: remainingDays > 0 ? 
-          `تبقى ${remainingDays} ${remainingDays === 1 ? 'يوم' : 'أيام'} على انتهاء الفترة التجريبية` :
-          'انتهت الفترة التجريبية'
-      });
-
+  // إذا كان المعرّف موجوداً في قاعدة البيانات
+  if (trialDatabase.has(deviceId)) {
+    const trialStart = trialDatabase.get(deviceId).trialStartDate;
+    if (isTrialExpired(trialStart)) {
+      // إرسال استجابة "منتهية"
+      return res.json({ status: 'expired', message: 'انتهت الفترة التجريبية.' });
     } else {
-      // جهاز جديد - إنشاء فترة تجريبية جديدة
-      const trialStartDate = now.toISOString();
-
-      database[deviceId] = {
-        device_id: deviceId,
-        trial_start_date: trialStartDate,
-        status: 'active',
-        created_at: trialStartDate,
-        last_access: trialStartDate
-      };
-
-      await writeDatabase(database);
-
-      return res.json({
-        status: 'active',
-        remaining_days: TRIAL_DURATION_DAYS,
-        trial_start_date: trialStartDate,
-        message: `مرحباً! لديك ${TRIAL_DURATION_DAYS} أيام فترة تجريبية مجانية`
-      });
+      // إرسال استجابة "نشطة"
+      const remainingDays = Math.ceil((new Date(trialStart).getTime() + (TRIAL_DAYS * 24 * 60 * 60 * 1000) - new Date().getTime()) / (1000 * 60 * 60 * 24));
+      return res.json({ status: 'active', remaining_days: remainingDays });
     }
-
-  } catch (error) {
-    console.error('خطأ في التحقق من الفترة التجريبية:', error);
-    return res.status(500).json({ 
-      error: 'خطأ داخلي في الخادم',
-      status: 'error'
+  } else {
+    // إذا كان المعرّف جديداً، قم بتسجيله
+    trialDatabase.set(deviceId, {
+      trialStartDate: new Date().toISOString(),
+      status: 'active'
     });
+    return res.json({ status: 'active', remaining_days: TRIAL_DAYS });
   }
 });
 
-// نقطة نهاية لإحصائيات الفترة التجريبية (للمطورين)
-app.get('/api/trial-stats', async (req, res) => {
-  try {
-    const database = await readDatabase();
-    const devices = Object.values(database);
+// 6. خدمة الملفات الثابتة لتطبيق React
+// تأكد من أن تطبيق React الخاص بك تم بناؤه وأن ملفاته موجودة في مجلد "dist"
+app.use(express.static(path.join(__dirname, 'dist')));
 
-    const stats = {
-      total_devices: devices.length,
-      active_trials: devices.filter(d => d.status === 'active').length,
-      expired_trials: devices.filter(d => d.status === 'expired').length,
-      devices: devices.map(d => ({
-        device_id: d.device_id,
-        status: d.status,
-        trial_start_date: d.trial_start_date,
-        last_access: d.last_access
-      }))
-    };
-
-    res.json(stats);
-  } catch (error) {
-    console.error('خطأ في جلب الإحصائيات:', error);
-    res.status(500).json({ error: 'خطأ داخلي في الخادم' });
-  }
+// 7. المسار الشامل (Catch-all Route) لتوجيه الطلبات
+// **ملاحظة: هذا المسار يجب أن يكون آخر مسار في الملف لتجنب الأخطاء**
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-// بدء الخادم
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 خادم الفترة التجريبية يعمل على المنفذ ${PORT}`);
-  console.log(`📊 احصائيات الفترة التجريبية: http://0.0.0.0:${PORT}/api/trial-stats`);
+// 8. تشغيل الخادم
+app.listen(PORT, () => {
+  console.log(`الخادم يعمل على المنفذ: ${PORT}`);
 });
-
-export default app;
