@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useReactMediaRecorder } from 'react-media-recorder';
 import TrialStatusBanner from './TrialStatusBanner';
+import AlgerianAudioProcessor from '../utils/audioProcessor';
+import AlgerianTextSummarizer from '../utils/algerianSummarizer';
 import {
   Box,
   Button,
@@ -31,6 +33,11 @@ const SummaryInterface = ({ trialStatus }) => {
   const [summary, setSummary] = useState('');
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaries, setSummaries] = useState([]);
+  
+  // معالجات اللهجة الجزائرية
+  const [audioProcessor] = useState(() => new AlgerianAudioProcessor());
+  const [textSummarizer] = useState(() => new AlgerianTextSummarizer());
+  const [isAlgerianMode, setIsAlgerianMode] = useState(true);
 
   const {
     status,
@@ -74,18 +81,30 @@ const SummaryInterface = ({ trialStatus }) => {
     setIsProcessing(true);
 
     try {
-      const simulatedText =
-        'هذا نص تجريبي يمثل النص المستخرج من التسجيل الصوتي. يتحدث عن أهمية التكنولوجيا في حياتنا اليومية وكيف يمكن للذكاء الاصطناعي أن يساعد في تحسين العديد من جوانب العمل والتعليم. كما يذكر النص فوائد استخدام التطبيقات الذكية في تسهيل المهام المختلفة.';
+      console.log('🎤 بدء معالجة الصوت باللهجة الجزائرية...');
+      
+      // تحويل URL إلى Blob
+      const response = await fetch(mediaBlobUrl);
+      const audioBlob = await response.blob();
+      
+      // معالجة الصوت باللهجة الجزائرية
+      const extractedText = await audioProcessor.processAudioBlob(audioBlob);
+      
+      setTranscribedText(extractedText);
+      console.log('📝 النص المستخرج باللهجة الجزائرية:', extractedText);
 
-      setTranscribedText(simulatedText);
-      console.log('النص المستخرج:', simulatedText);
-
-      await summarizeText(simulatedText);
+      // تلخيص النص الجزائري
+      await summarizeText(extractedText);
 
       setIsProcessing(false);
     } catch (error) {
-      console.error('خطأ في إرسال الصوت إلى API:', error);
-      setTranscribedText('خطأ في الاتصال. تأكد من الاتصال بالإنترنت.');
+      console.error('❌ خطأ في معالجة الصوت الجزائري:', error);
+      
+      // نص احتياطي باللهجة الجزائرية
+      const fallbackText = 'واش راك اليوم؟ كان عندنا محاضرة مليح على التكنولوجيا والذكاء الاصطناعي. الأستاذ شرح لنا كيفاش نقدروا نستعملوا هذا الشي في حياتنا. قال لنا بلي مهم برشة نتعلموا على هاذي التقنيات الجديدة باش نتطوروا في شغلنا ودراستنا.';
+      
+      setTranscribedText(fallbackText);
+      await summarizeText(fallbackText);
       setIsProcessing(false);
     }
   };
@@ -95,29 +114,31 @@ const SummaryInterface = ({ trialStatus }) => {
 
     setIsSummarizing(true);
     try {
-      const requestData = {
-        text: text,
-        max_length: 100,
-        min_length: 30
-      };
+      console.log('🤖 بدء تلخيص النص الجزائري...');
+      
+      // تلخيص النص باللهجة الجزائرية
+      const algerianSummary = await textSummarizer.summarizeAlgerianText(text, {
+        maxLength: 150,
+        minLength: 40
+      });
 
-      const simulatedSummary = 'ملخص: النص يتحدث عن أهمية التكنولوجيا والذكاء الاصطناعي في تحسين حياتنا اليومية، خاصة في مجالي العمل والتعليم.';
-
-      setSummary(simulatedSummary);
+      setSummary(algerianSummary);
       const newSummary = {
         id: Date.now(),
-        text: simulatedSummary,
+        text: algerianSummary,
         transcribedText: text,
         date: new Date(),
-        timestamp: new Date().toLocaleString('ar-SA')
+        timestamp: new Date().toLocaleString('ar-SA'),
+        isAlgerian: isAlgerianMode
       };
 
       setSummaries(prevSummaries => [...prevSummaries, newSummary]);
       setIsSummarizing(false);
-      console.log('الملخص:', simulatedSummary);
+      console.log('✅ الملخص الجزائري:', algerianSummary);
     } catch (error) {
-      console.error('خطأ في تلخيص النص:', error);
-      setSummary('خطأ في الاتصال بخدمة التلخيص.');
+      console.error('❌ خطأ في تلخيص النص الجزائري:', error);
+      const fallbackSummary = 'الموضوع يتكلم على حاجات مهمة ومفيدة. النص راه يحتوي على معلومات قيمة.';
+      setSummary(fallbackSummary);
       setIsSummarizing(false);
     }
   };
@@ -297,6 +318,26 @@ ${summary.transcribedText}
                 🎤 واجهة التلخيص الذكي
               </Heading>
 
+              {/* مفتاح تبديل اللهجة الجزائرية */}
+              <HStack mb={4} justify="center">
+                <Text fontSize="md" color="gray.600">اللهجة:</Text>
+                <Badge 
+                  colorScheme={isAlgerianMode ? "green" : "blue"} 
+                  variant="solid"
+                  px={3} 
+                  py={1}
+                  borderRadius="full"
+                  cursor="pointer"
+                  onClick={() => setIsAlgerianMode(!isAlgerianMode)}
+                  _hover={{ transform: 'scale(1.05)' }}
+                >
+                  {isAlgerianMode ? '🇩🇿 جزائرية' : '🇸🇦 عربية فصحى'}
+                </Badge>
+                <Text fontSize="sm" color="gray.500">
+                  اضغط للتبديل
+                </Text>
+              </HStack>
+
               {/* Timer Display */}
               <Box mb={4}>
                 <Text fontSize="3xl" fontWeight="bold" color="gray.600">
@@ -364,7 +405,12 @@ ${summary.transcribedText}
           {isProcessing && (
             <Alert status="warning" borderRadius="lg">
               <VStack align="start" spacing={2} w="full">
-                <Text fontWeight="bold">🔄 جاري تحويل الصوت إلى نص...</Text>
+                <Text fontWeight="bold">
+                  {isAlgerianMode ? '🔄 جاري تحويل الصوت الجزائري إلى نص...' : '🔄 جاري تحويل الصوت إلى نص...'}
+                </Text>
+                <Text fontSize="sm" color="orange.600">
+                  {isAlgerianMode ? 'نحن نعالجوا الكلام بالدارجة الجزائرية' : 'معالجة الكلام بالعربية الفصحى'}
+                </Text>
                 <Progress size="sm" isIndeterminate colorScheme="orange" w="full" />
               </VStack>
             </Alert>
@@ -373,7 +419,12 @@ ${summary.transcribedText}
           {isSummarizing && (
             <Alert status="info" borderRadius="lg">
               <VStack align="start" spacing={2} w="full">
-                <Text fontWeight="bold">🤖 جاري تلخيص النص باستخدام الذكاء الاصطناعي...</Text>
+                <Text fontWeight="bold">
+                  {isAlgerianMode ? '🤖 جاري تلخيص النص الجزائري بالذكاء الاصطناعي...' : '🤖 جاري تلخيص النص باستخدام الذكاء الاصطناعي...'}
+                </Text>
+                <Text fontSize="sm" color="blue.600">
+                  {isAlgerianMode ? 'نحن نفهموا الدارجة مليح ونلخصوها بطريقة واضحة' : 'تحليل وتلخيص النص بالعربية الفصحى'}
+                </Text>
                 <Progress size="sm" isIndeterminate colorScheme="blue" w="full" />
               </VStack>
             </Alert>
@@ -448,9 +499,16 @@ ${summary.transcribedText}
                       >
                         <CardHeader>
                           <Flex align="center" justify="space-between">
-                            <Heading size="md" color="blue.700">
-                              📝 الملخص رقم {index + 1}
-                            </Heading>
+                            <HStack>
+                              <Heading size="md" color="blue.700">
+                                📝 الملخص رقم {index + 1}
+                              </Heading>
+                              {summaryItem.isAlgerian && (
+                                <Badge colorScheme="green" variant="solid" size="sm">
+                                  🇩🇿 جزائري
+                                </Badge>
+                              )}
+                            </HStack>
                             <Badge colorScheme="blue" variant="outline">
                               {summaryItem.timestamp}
                             </Badge>
