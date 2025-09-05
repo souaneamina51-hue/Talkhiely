@@ -1,0 +1,66 @@
+تمام، إليك pseudo-code جاهز للمطور لتقسيم التسجيلات الطويلة ومعالجتها باللهجة الجزائرية مع دمج النصوص النهائية:
+
+🔹 Pseudo-Code: تقسيم التسجيلات الطويلة ومعالجتها
+// إعدادات
+const CHUNK_DURATION = 30; // بالثواني لكل مقطع
+let finalText = "";
+
+// دالة لتقسيم التسجيل الطويل إلى مقاطع
+function splitAudio(audioFile, chunkDuration = CHUNK_DURATION) {
+  // افتراض: audioFile يحتوي على كل التسجيل
+  // احسب عدد المقاطع
+  const totalDuration = audioFile.duration; // بالثواني
+  const numChunks = Math.ceil(totalDuration / chunkDuration);
+
+  let chunks = [];
+  for (let i = 0; i < numChunks; i++) {
+    const start = i * chunkDuration;
+    const end = Math.min((i + 1) * chunkDuration, totalDuration);
+    // استخراج مقطع من التسجيل
+    chunks.push(audioFile.slice(start, end));
+  }
+  return chunks;
+}
+
+// دالة لمعالجة كل مقطع وتحويله إلى نص
+async function processChunk(chunk) {
+  try {
+    const text = await convertAudioToText(chunk, { language: "ar-DZ" }); // التعرف على اللهجة الجزائرية
+    return text;
+  } catch (error) {
+    console.error("خطأ في معالجة المقطع:", error);
+    return ""; // تجاهل المقطع الفاشل مؤقتًا
+  } finally {
+    // تنظيف الذاكرة
+    chunk = null;
+  }
+}
+
+// الدالة الرئيسية لمعالجة التسجيل الكامل
+async function processFullAudio(audioFile) {
+  const chunks = splitAudio(audioFile);
+  
+  for (let i = 0; i < chunks.length; i++) {
+    console.log(`🔄 معالجة المقطع ${i + 1} من ${chunks.length}...`);
+    const text = await processChunk(chunks[i]);
+    finalText += text + " "; // دمج النصوص الجزئية
+  }
+
+  // بعد معالجة كل المقاطع
+  console.log("✅ النص الكامل جاهز للتلخيص:");
+  console.log(finalText);
+
+  // إرسال النص الكامل للنموذج الذكاء الاصطناعي للتلخيص
+  const summary = await summarizeText(finalText);
+  displaySummary(summary);
+}
+
+ملاحظات للمطور
+
+كل مقطع يتم تنظيفه من الذاكرة بعد معالجته (chunk = null).
+
+النصوص الجزئية تُدمج تدريجيًا لتجنب تحميل جميع المقاطع في مصفوفة كبيرة.
+
+شريط التقدم يمكن ربطه بمؤشر الحلقة for (let i = 0; i < chunks.length; i++).
+
+التأكد من دعم convertAudioToText للهجة الجزائرية (ar-DZ).
