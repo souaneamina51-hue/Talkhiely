@@ -40,6 +40,16 @@ const SummaryInterface = ({ trialStatus }) => {
   const [textSummarizer] = useState(() => new AlgerianTextSummarizer());
   const [isAlgerianMode, setIsAlgerianMode] = useState(true);
 
+  // تنظيف الموارد عند إلغاء تحميل المكون
+  useEffect(() => {
+    return () => {
+      if (audioProcessor && typeof audioProcessor.destroy === 'function') {
+        audioProcessor.destroy();
+        console.log('🧹 تم تنظيف موارد معالج الصوت');
+      }
+    };
+  }, [audioProcessor]);
+
   const {
     status,
     startRecording,
@@ -277,33 +287,42 @@ const SummaryInterface = ({ trialStatus }) => {
   
 
   const getProgressMessage = (progress) => {
-    switch (progress.stage) {
-      case 'initializing':
-        return 'تهيئة نظام التعرف على الكلام باللهجة الجزائرية...';
-      case 'loading':
-        return 'تحميل وفحص جودة الملف الصوتي...';
-      case 'preparing':
-        return 'إعداد معالج اللهجة الجزائرية وتحليل مدة التسجيل...';
-      case 'splitting':
-        return `تقسيم التسجيل الطويل إلى ${progress.total || 'عدة'} مقاطع قابلة للمعالجة...`;
-      case 'processing':
-        if (progress.total > 1) {
-          const percentage = Math.round((progress.current / progress.total) * 100);
-          return `معالجة المقطع ${progress.current}/${progress.total} باللهجة الجزائرية (${percentage}%)`;
-        } else {
-          return 'التعرف على الكلام باللهجة الجزائرية وتحويله إلى نص...';
-        }
-      case 'merging':
-        return 'دمج وتنظيف النصوص المستخرجة وإزالة التكرار والأخطاء...';
-      case 'complete':
-        return 'تمت معالجة جميع المقاطع بنجاح! جاري التحضير للتلخيص...';
-      case 'analyzing':
-        return 'تحليل النص الجزائري وفهم السياق والمحتوى...';
-      case 'summarizing':
-        return 'إنشاء الملخص الذكي باستخدام الذكاء الاصطناعي المتخصص...';
-      default:
-        return 'معالجة متقدمة للصوت والنص باللهجة الجزائرية...';
+    const baseMessage = (() => {
+      switch (progress.stage) {
+        case 'initializing':
+          return 'تهيئة نظام التعرف على الكلام باللهجة الجزائرية...';
+        case 'loading':
+          return 'تحميل وفحص جودة الملف الصوتي...';
+        case 'preparing':
+          return 'إعداد معالج اللهجة الجزائرية وتحليل مدة التسجيل...';
+        case 'splitting':
+          return `تقسيم التسجيل الطويل إلى ${progress.total || 'عدة'} مقاطع قابلة للمعالجة...`;
+        case 'processing':
+          if (progress.total > 1) {
+            const percentage = Math.round((progress.current / progress.total) * 100);
+            return `معالجة المقطع ${progress.current}/${progress.total} باللهجة الجزائرية (${percentage}%)`;
+          } else {
+            return 'التعرف على الكلام باللهجة الجزائرية وتحويله إلى نص...';
+          }
+        case 'merging':
+          return 'دمج وتنظيف النصوص المستخرجة وإزالة التكرار والأخطاء...';
+        case 'complete':
+          return 'تمت معالجة جميع المقاطع بنجاح! جاري التحضير للتلخيص...';
+        case 'analyzing':
+          return 'تحليل النص الجزائري وفهم السياق والمحتوى...';
+        case 'summarizing':
+          return 'إنشاء الملخص الذكي باستخدام الذكاء الاصطناعي المتخصص...';
+        default:
+          return 'معالجة متقدمة للصوت والنص باللهجة الجزائرية...';
+      }
+    })();
+
+    // إضافة معلومات الذاكرة إذا كانت متاحة
+    if (progress.memoryInfo) {
+      return `${baseMessage}\n📊 ${progress.memoryInfo}`;
     }
+
+    return baseMessage;
   };
 
   const summarizeText = async (text) => {
@@ -607,27 +626,59 @@ ${summary.transcribedText}
                 </Text>
                 
                 {processingProgress ? (
-                  <VStack align="start" spacing={2} w="full">
-                    <Text fontSize="sm" color="orange.700" fontWeight="semibold">
+                  <VStack align="start" spacing={3} w="full">
+                    <Text 
+                      fontSize="sm" 
+                      color="orange.700" 
+                      fontWeight="semibold"
+                      whiteSpace="pre-line"
+                      lineHeight="1.4"
+                    >
                       {processingProgress.message}
                     </Text>
+                    
                     {processingProgress.stage === 'processing' && (
-                      <HStack w="full" spacing={2}>
-                        <Progress
-                          value={(processingProgress.current / processingProgress.total) * 100}
-                          colorScheme="orange"
-                          size="md"
-                          w="full"
-                          hasStripe
-                          isAnimated
-                        />
-                        <Text fontSize="xs" color="orange.600" minW="60px">
-                          {processingProgress.current}/{processingProgress.total}
-                        </Text>
-                      </HStack>
+                      <VStack w="full" spacing={2}>
+                        <HStack w="full" spacing={2}>
+                          <Progress
+                            value={(processingProgress.current / processingProgress.total) * 100}
+                            colorScheme="orange"
+                            size="md"
+                            w="full"
+                            hasStripe
+                            isAnimated
+                          />
+                          <Text fontSize="xs" color="orange.600" minW="60px">
+                            {processingProgress.current}/{processingProgress.total}
+                          </Text>
+                        </HStack>
+                        
+                        {/* شريط تقدم إضافي للذاكرة إذا كانت متاحة */}
+                        {processingProgress.memoryInfo && (
+                          <Text fontSize="xs" color="gray.500" textAlign="center" w="full">
+                            🧠 إدارة الذاكرة: تنظيف تلقائي بعد كل مقطع
+                          </Text>
+                        )}
+                      </VStack>
                     )}
+                    
                     {processingProgress.stage !== 'processing' && (
-                      <Progress size="sm" isIndeterminate colorScheme="orange" w="full" />
+                      <VStack w="full" spacing={2}>
+                        <Progress size="sm" isIndeterminate colorScheme="orange" w="full" />
+                        
+                        {/* نصائح للمستخدم حسب المرحلة */}
+                        {processingProgress.stage === 'merging' && (
+                          <Text fontSize="xs" color="gray.500" textAlign="center">
+                            💡 نصيحة: التسجيلات القصيرة (أقل من 30 ثانية) تعطي نتائج أسرع
+                          </Text>
+                        )}
+                        
+                        {processingProgress.stage === 'loading' && (
+                          <Text fontSize="xs" color="gray.500" textAlign="center">
+                            ⚡ للحصول على أفضل النتائج، تحدث بوضوح في مكان هادئ
+                          </Text>
+                        )}
+                      </VStack>
                     )}
                   </VStack>
                 ) : (
