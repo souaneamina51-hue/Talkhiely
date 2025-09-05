@@ -8,7 +8,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 3000;
+
+// تحسين الإعدادات للتسجيلات الطويلة
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // تقديم الملفات الثابتة من مجلد dist
 app.use(express.static(path.join(__dirname, 'dist')));

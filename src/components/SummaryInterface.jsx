@@ -124,15 +124,20 @@ const SummaryInterface = ({ trialStatus }) => {
   const getProgressMessage = (progress) => {
     switch (progress.stage) {
       case 'splitting':
-        return 'جاري تقسيم التسجيل إلى مقاطع...';
+        return 'جاري تحليل وتقسيم التسجيل الطويل إلى مقاطع قابلة للمعالجة...';
       case 'processing':
-        return `معالجة المقطع ${progress.current} من ${progress.total}...`;
+        const percentage = Math.round((progress.current / progress.total) * 100);
+        return `معالجة المقطع ${progress.current} من ${progress.total} باللهجة الجزائرية (${percentage}%)`;
       case 'merging':
-        return 'دمج النصوص المستخرجة...';
+        return 'دمج وتنظيف النصوص المستخرجة وإزالة التكرار...';
       case 'complete':
-        return 'تمت المعالجة بنجاح!';
+        return 'تمت معالجة التسجيل الطويل بنجاح! جاري التلخيص...';
+      case 'analyzing':
+        return 'تحليل بنية النص وتحديد النقاط المهمة...';
+      case 'summarizing':
+        return 'إنشاء الملخص الشامل باستخدام الذكاء الاصطناعي...';
       default:
-        return 'جاري المعالجة...';
+        return 'جاري المعالجة المتقدمة...';
     }
   };
 
