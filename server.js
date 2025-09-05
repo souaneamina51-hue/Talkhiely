@@ -17,8 +17,23 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // 3. تفعيل الـ Middleware
-app.use(cors()); // لتجنب مشاكل CORS
+const corsOptions = {
+  origin: [
+    'http://localhost:5173', // Vite dev server
+    'http://localhost:3000', // Express server
+    'https://*.replit.dev',  // Replit domains
+    'https://*.replit.com',  // Replit domains
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions)); // لتجنب مشاكل CORS
 app.use(express.json()); // لاستقبال بيانات JSON من الواجهة الأمامية
+
+// معالج preflight requests
+app.options('*', cors(corsOptions));
 
 // 4. قاعدة بيانات مؤقتة للفترات التجريبية
 const trialDatabase = new Map();
@@ -33,11 +48,14 @@ const isTrialExpired = (startDate) => {
 
 // 5. نقطة النهاية (Endpoint) للتحقق من الفترة التجريبية
 app.post('/api/check-trial', (req, res) => {
-  const { deviceId } = req.body;
+  try {
+    console.log('📨 استقبال طلب تحقق من الفترة التجريبية:', req.body);
+    
+    const { deviceId } = req.body;
 
-  if (!deviceId) {
-    return res.status(400).json({ status: 'error', message: 'معرّف الجهاز مطلوب.' });
-  }
+    if (!deviceId) {
+      return res.status(400).json({ status: 'error', message: 'معرّف الجهاز مطلوب.' });
+    }
 
   // إذا كان المعرّف موجوداً في قاعدة البيانات
   if (trialDatabase.has(deviceId)) {
@@ -56,7 +74,13 @@ app.post('/api/check-trial', (req, res) => {
       trialStartDate: new Date().toISOString(),
       status: 'active'
     });
-    return res.json({ status: 'active', remaining_days: TRIAL_DAYS });
+    const response = { status: 'active', remaining_days: TRIAL_DAYS };
+    console.log('✅ إرسال استجابة:', response);
+    return res.json(response);
+  }
+  } catch (error) {
+    console.error('❌ خطأ في API:', error);
+    return res.status(500).json({ status: 'error', message: 'خطأ في الخادم' });
   }
 });
 
