@@ -13,8 +13,8 @@ const __dirname = path.dirname(__filename);
 
 // 2. إعداد التطبيق والمنفذ
 const app = express();
-// استخدام متغير البيئة PORT الخاص بـ Replit أو استخدام 5000 كقيمة افتراضية
-const PORT = process.env.PORT || 5000;
+// استخدام متغير البيئة PORT الخاص بـ Replit أو استخدام 3000 كقيمة افتراضية
+const PORT = process.env.PORT || 3000;
 
 // 3. تفعيل الـ Middleware
 app.use(cors()); // لتجنب مشاكل CORS
@@ -67,7 +67,7 @@ app.use(express.static(path.join(__dirname, 'dist')));
 // 7. المسار الشامل (Catch-all Route) لتوجيه الطلبات
 // **ملاحظة: هذا المسار يجب أن يكون آخر مسار في الملف لتجنب الأخطاء**
 // أي Route غير موجود يوجّه لـ index.html (عشان React Router يشتغل)
-app.get('*', (req, res) => {
+app.get(/^(?!\/api).*$/, (req, res) => {
   res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
@@ -75,4 +75,5 @@ app.get('*', (req, res) => {
 // 8. تشغيل الخادم
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`الخادم يعمل على المنفذ: ${PORT}`);
+  console.log(`يمكنك الوصول للتطبيق على: http://localhost:${PORT}`);
 });
