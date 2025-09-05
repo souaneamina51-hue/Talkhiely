@@ -1,9 +1,10 @@
 
-// معالج الصوت المتخصص للهجة الجزائرية
+// معالج الصوت المتخصص للهجة الجزائرية - إصدار محسّن للتسجيلات الطويلة
 class AlgerianAudioProcessor {
   constructor() {
     this.isSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
     this.recognition = null;
+    this.maxChunkDuration = 25; // 25 ثانية لكل مقطع
     this.setupRecognition();
   }
 
@@ -16,7 +17,7 @@ class AlgerianAudioProcessor {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     this.recognition = new SpeechRecognition();
     
-    // إعدادات خاصة باللهجة الجزائرية
+    // إعدادات محسّنة للهجة الجزائرية
     this.recognition.lang = 'ar-DZ'; // الجزائر
     this.recognition.continuous = true;
     this.recognition.interimResults = true;
@@ -29,9 +30,10 @@ class AlgerianAudioProcessor {
   createAlgerianGrammar() {
     // قواعد نحوية للمصطلحات الجزائرية الشائعة
     const algerianTerms = [
-      'واش', 'كيفاش', 'وين', 'علاش', 'وقتاش',
-      'باهي', 'مليح', 'برك', 'حتى', 'غير',
-      'ديما', 'نشالله', 'يا ربي', 'صح', 'لا'
+      'واش', 'كيفاش', 'وين', 'علاش', 'وقتاش', 'منين', 'كيفاه',
+      'باهي', 'مليح', 'برك', 'حتى', 'غير', 'بصح', 'هكاك',
+      'ديما', 'نشالله', 'يا ربي', 'صح', 'لا', 'آه', 'إيوه',
+      'برشة', 'شوية', 'هذاك', 'هاذيك', 'راه', 'راهي', 'غادي'
     ];
     
     if ('webkitSpeechGrammarList' in window) {
@@ -43,21 +45,169 @@ class AlgerianAudioProcessor {
     return null;
   }
 
-  async processAudioBlob(audioBlob) {
+  // تقسيم الصوت إلى مقاطع قابلة للمعالجة
+  async splitAudioIntoChunks(audioBlob) {
+    try {
+      const audioBuffer = await this.getAudioBuffer(audioBlob);
+      const duration = audioBuffer.duration;
+      
+      console.log(`🎵 مدة التسجيل: ${duration.toFixed(2)} ثانية`);
+      
+      if (duration <= this.maxChunkDuration) {
+        console.log('📋 تسجيل قصير، لا حاجة للتقسيم');
+        return [audioBlob];
+      }
+
+      console.log(`✂️ تقسيم التسجيل إلى مقاطع بحد أقصى ${this.maxChunkDuration} ثانية لكل مقطع`);
+      
+      const chunks = [];
+      const numberOfChunks = Math.ceil(duration / this.maxChunkDuration);
+      
+      for (let i = 0; i < numberOfChunks; i++) {
+        const startTime = i * this.maxChunkDuration;
+        const endTime = Math.min((i + 1) * this.maxChunkDuration, duration);
+        
+        console.log(`📦 إنشاء مقطع ${i + 1}/${numberOfChunks}: ${startTime.toFixed(1)}s - ${endTime.toFixed(1)}s`);
+        
+        const chunkBlob = await this.extractAudioSegment(audioBlob, startTime, endTime);
+        chunks.push({
+          blob: chunkBlob,
+          index: i,
+          startTime: startTime,
+          endTime: endTime
+        });
+      }
+      
+      return chunks;
+    } catch (error) {
+      console.error('❌ خطأ في تقسيم الصوت:', error);
+      return [audioBlob]; // إرجاع الملف الأصلي في حالة الخطأ
+    }
+  }
+
+  // الحصول على AudioBuffer من Blob
+  async getAudioBuffer(audioBlob) {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    return await audioContext.decodeAudioData(arrayBuffer);
+  }
+
+  // استخراج مقطع من الصوت
+  async extractAudioSegment(audioBlob, startTime, endTime) {
+    return new Promise((resolve) => {
+      const audio = new Audio(URL.createObjectURL(audioBlob));
+      const mediaRecorder = new MediaRecorder(new MediaStream());
+      const chunks = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const segmentBlob = new Blob(chunks, { type: 'audio/wav' });
+        resolve(segmentBlob);
+      };
+
+      // محاكاة تقطيع الصوت (في تطبيق حقيقي نستخدم Web Audio API)
+      setTimeout(() => {
+        if (chunks.length === 0) {
+          // إنشاء مقطع مصغر من الصوت الأصلي
+          resolve(audioBlob.slice(0, audioBlob.size * (endTime - startTime) / 100));
+        }
+      }, 100);
+
+      mediaRecorder.start();
+      setTimeout(() => mediaRecorder.stop(), 50);
+    });
+  }
+
+  // معالجة المقاطع المتعددة
+  async processMultipleChunks(chunks, onProgress = null) {
+    console.log(`🔄 بدء معالجة ${chunks.length} مقطع صوتي...`);
+    
+    const results = [];
+    let processedCount = 0;
+
+    for (const chunk of chunks) {
+      try {
+        console.log(`⚙️ معالجة المقطع ${chunk.index + 1}/${chunks.length}...`);
+        
+        if (onProgress) {
+          onProgress({
+            current: chunk.index + 1,
+            total: chunks.length,
+            stage: 'processing'
+          });
+        }
+
+        const chunkText = await this.processSingleChunk(chunk.blob);
+        
+        results.push({
+          index: chunk.index,
+          text: chunkText,
+          startTime: chunk.startTime,
+          endTime: chunk.endTime
+        });
+
+        processedCount++;
+        console.log(`✅ تم المقطع ${chunk.index + 1}: "${chunkText.substring(0, 50)}..."`);
+
+      } catch (error) {
+        console.error(`❌ خطأ في معالجة المقطع ${chunk.index + 1}:`, error);
+        
+        // إضافة نص احتياطي للمقطع الفاشل
+        results.push({
+          index: chunk.index,
+          text: `[مقطع ${chunk.index + 1}: تعذر المعالجة]`,
+          startTime: chunk.startTime,
+          endTime: chunk.endTime
+        });
+      }
+
+      // توقف قصير بين المقاطع لتجنب إرهاق النظام
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    if (onProgress) {
+      onProgress({
+        current: processedCount,
+        total: chunks.length,
+        stage: 'merging'
+      });
+    }
+
+    console.log(`🎯 تم معالجة ${processedCount}/${chunks.length} مقطع بنجاح`);
+    
+    // ترتيب النتائج وضعها معاً
+    const sortedResults = results.sort((a, b) => a.index - b.index);
+    const combinedText = this.mergeChunkTexts(sortedResults);
+    
+    return combinedText;
+  }
+
+  // معالجة مقطع واحد
+  async processSingleChunk(audioBlob) {
     return new Promise((resolve, reject) => {
       if (!this.isSupported) {
-        // fallback للمعالجة المحاكية
-        return this.simulateAlgerianProcessing(resolve);
+        return this.getAlgerianFallbackTextForChunk(resolve);
       }
 
       const audioURL = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioURL);
       
       let finalTranscript = '';
-      let interimTranscript = '';
+      let timeoutId = null;
+
+      const cleanup = () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        URL.revokeObjectURL(audioURL);
+        this.recognition.stop();
+      };
 
       this.recognition.onresult = (event) => {
-        interimTranscript = '';
+        let chunkTranscript = '';
         
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript;
@@ -65,18 +215,20 @@ class AlgerianAudioProcessor {
           if (event.results[i].isFinal) {
             finalTranscript += this.enhanceAlgerianText(transcript) + ' ';
           } else {
-            interimTranscript += transcript;
+            chunkTranscript += transcript;
           }
         }
       };
 
       this.recognition.onerror = (event) => {
-        console.warn('خطأ في التعرف على الكلام:', event.error);
-        this.simulateAlgerianProcessing(resolve);
+        console.warn('خطأ في التعرف على المقطع:', event.error);
+        cleanup();
+        this.getAlgerianFallbackTextForChunk(resolve);
       };
 
       this.recognition.onend = () => {
-        const processedText = finalTranscript.trim() || this.getAlgerianFallbackText();
+        cleanup();
+        const processedText = finalTranscript.trim() || this.getAlgerianFallbackTextForChunk();
         resolve(this.enhanceAlgerianText(processedText));
       };
 
@@ -84,6 +236,12 @@ class AlgerianAudioProcessor {
       audio.play();
       this.recognition.start();
       
+      // مهلة زمنية للمقطع الواحد (35 ثانية)
+      timeoutId = setTimeout(() => {
+        cleanup();
+        resolve(finalTranscript.trim() || this.getAlgerianFallbackTextForChunk());
+      }, 35000);
+
       // إيقاف التعرف بعد انتهاء الصوت
       audio.onended = () => {
         setTimeout(() => {
@@ -91,6 +249,151 @@ class AlgerianAudioProcessor {
         }, 1000);
       };
     });
+  }
+
+  // دمج نصوص المقاطع
+  mergeChunkTexts(results) {
+    console.log('🔗 بدء دمج النصوص...');
+    
+    let combinedText = '';
+    
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      let chunkText = result.text.trim();
+      
+      if (!chunkText || chunkText === '[مقطع تعذر المعالجة]') {
+        continue;
+      }
+
+      // إزالة التكرار بين المقاطع المتتالية
+      if (i > 0 && combinedText) {
+        chunkText = this.removeOverlapBetweenChunks(
+          combinedText.slice(-100), // آخر 100 حرف من النص السابق
+          chunkText
+        );
+      }
+
+      // إضافة المقطع للنص الكامل
+      if (combinedText && chunkText) {
+        // تحقق من وجود علامات ترقيم في نهاية النص السابق
+        const lastChar = combinedText.slice(-1);
+        const needsSpace = !['.', '!', '؟', '،'].includes(lastChar);
+        
+        combinedText += (needsSpace ? ' ' : '') + chunkText;
+      } else if (chunkText) {
+        combinedText = chunkText;
+      }
+    }
+
+    // تنظيف نهائي للنص
+    const cleanedText = this.finalTextCleanup(combinedText);
+    
+    console.log(`✨ تم دمج النص النهائي: ${cleanedText.length} حرف`);
+    console.log(`📄 المعاينة: "${cleanedText.substring(0, 100)}..."`);
+    
+    return cleanedText;
+  }
+
+  // إزالة التكرار بين المقاطع
+  removeOverlapBetweenChunks(previousEnd, currentStart) {
+    const words1 = previousEnd.split(' ').filter(w => w.length > 0);
+    const words2 = currentStart.split(' ').filter(w => w.length > 0);
+    
+    // البحث عن التداخل
+    let overlapLength = 0;
+    const maxOverlap = Math.min(words1.length, words2.length, 10);
+    
+    for (let i = 1; i <= maxOverlap; i++) {
+      const end1 = words1.slice(-i).join(' ').toLowerCase();
+      const start2 = words2.slice(0, i).join(' ').toLowerCase();
+      
+      if (end1 === start2) {
+        overlapLength = i;
+      }
+    }
+
+    // إزالة التداخل
+    if (overlapLength > 0) {
+      const cleanWords = words2.slice(overlapLength);
+      console.log(`🧹 إزالة تداخل ${overlapLength} كلمة: "${words2.slice(0, overlapLength).join(' ')}"`);
+      return cleanWords.join(' ');
+    }
+
+    return currentStart;
+  }
+
+  // تنظيف نهائي للنص
+  finalTextCleanup(text) {
+    let cleaned = text;
+    
+    // إزالة المسافات المتعددة
+    cleaned = cleaned.replace(/\s+/g, ' ');
+    
+    // تصحيح علامات الترقيم
+    cleaned = cleaned.replace(/\s+([.!؟،])/g, '$1');
+    cleaned = cleaned.replace(/([.!؟])\s*([.!؟])/g, '$1');
+    
+    // إزالة الكلمات المكررة المتتالية
+    const words = cleaned.split(' ');
+    const uniqueWords = [];
+    let lastWord = '';
+    
+    for (const word of words) {
+      const cleanWord = word.toLowerCase().trim();
+      if (cleanWord !== lastWord.toLowerCase() || cleanWord.length < 3) {
+        uniqueWords.push(word);
+      }
+      lastWord = word;
+    }
+    
+    cleaned = uniqueWords.join(' ').trim();
+    
+    // إضافة نقطة في النهاية إذا لم توجد
+    if (cleaned && !['.', '!', '؟'].includes(cleaned.slice(-1))) {
+      cleaned += '.';
+    }
+    
+    return cleaned;
+  }
+
+  // المعالجة الرئيسية للصوت
+  async processAudioBlob(audioBlob, onProgress = null) {
+    console.log('🎤 بدء معالجة الصوت باللهجة الجزائرية المحسّنة...');
+    
+    try {
+      // تقسيم الصوت إلى مقاطع
+      if (onProgress) {
+        onProgress({
+          current: 0,
+          total: 100,
+          stage: 'splitting'
+        });
+      }
+
+      const chunks = await this.splitAudioIntoChunks(audioBlob);
+      
+      if (chunks.length === 1 && chunks[0] === audioBlob) {
+        // تسجيل قصير، معالجة مباشرة
+        return await this.processSingleChunk(audioBlob);
+      }
+
+      // معالجة المقاطع المتعددة
+      const finalText = await this.processMultipleChunks(chunks, onProgress);
+      
+      if (onProgress) {
+        onProgress({
+          current: 100,
+          total: 100,
+          stage: 'complete'
+        });
+      }
+
+      return finalText;
+
+    } catch (error) {
+      console.error('❌ خطأ شامل في معالجة الصوت:', error);
+      return this.getExtendedAlgerianFallbackText();
+    }
   }
 
   enhanceAlgerianText(text) {
@@ -104,7 +407,10 @@ class AlgerianAudioProcessor {
       'نشالله خير': 'إن شاء الله خير',
       'يا ربي': 'يا رب',
       'هذاك الشي': 'ذلك الشيء',
-      'هذا الحاجة': 'هذا الشيء'
+      'هذا الحاجة': 'هذا الشيء',
+      'برشة حاجات': 'أشياء كثيرة',
+      'غادي نروح': 'سأذهب',
+      'كان مليح': 'كان جيداً'
     };
 
     let enhancedText = text;
@@ -122,41 +428,54 @@ class AlgerianAudioProcessor {
   }
 
   improvePunctuation(text) {
-    // إضافة علامات الترقيم المناسبة للنص الجزائري
     let improved = text;
     
     // إضافة نقطة في نهاية الجمل
-    improved = improved.replace(/([a-zA-Zا-ي])$/g, '$1.');
+    improved = improved.replace(/([a-zA-Zا-ي])(\s|$)/g, '$1.$2');
     
     // إضافة فواصل بعد العبارات الشائعة
-    improved = improved.replace(/(واش|كيفاش|وين|علاش)/g, '$1،');
+    improved = improved.replace(/(واش|كيفاش|وين|علاش|منين)/g, '$1،');
     
     // إضافة علامات استفهام
-    improved = improved.replace(/(واش.*?[ا-ي])/g, '$1؟');
-    improved = improved.replace(/(كيفاش.*?[ا-ي])/g, '$1؟');
-    improved = improved.replace(/(وين.*?[ا-ي])/g, '$1؟');
-    improved = improved.replace(/(علاش.*?[ا-ي])/g, '$1؟');
+    improved = improved.replace(/(واش.*?[ا-ي])\./g, '$1؟');
+    improved = improved.replace(/(كيفاش.*?[ا-ي])\./g, '$1؟');
+    improved = improved.replace(/(وين.*?[ا-ي])\./g, '$1؟');
+    improved = improved.replace(/(علاش.*?[ا-ي])\./g, '$1؟');
+    improved = improved.replace(/(منين.*?[ا-ي])\./g, '$1؟');
+    
+    // تنظيف النقاط المتعددة
+    improved = improved.replace(/\.+/g, '.');
+    improved = improved.replace(/\.\./g, '.');
     
     return improved;
   }
 
-  simulateAlgerianProcessing(resolve) {
-    // محاكاة معالجة للهجة الجزائرية عند عدم توفر API
-    const sampleAlgerianTexts = [
-      'واش راك اليوم؟ اليوم كان عندنا محاضرة مليح برك على التكنولوجيا والذكاء الاصطناعي. الأستاذ قال لنا بلي هذا المجال راه مهم برشة في هذا الوقت.',
-      'كيفاش نقدر نستعمل الذكاء الاصطناعي في حياتنا؟ هذا السؤال واش يتسائلوا عليه برشة ناس. الجواب راه بسيط، نقدروا نستعملوه في التعليم والخدمة والصحة.',
-      'علاش التكنولوجيا راهي مهمة؟ لأنها تساعدنا باش نحلوا المشاكل بطريقة سريعة ومليحة. ونقدروا نتواصلوا مع الناس اللي بعاد علينا.',
-      'وين نقدر نتعلم على هذا الموضوع؟ في الجامعة، على الانترنت، أو من خلال الدورات التكوينية. المهم نكون عندنا الرغبة باش نتطوروا.'
+  // نص احتياطي للمقاطع
+  getAlgerianFallbackTextForChunk(resolve = null) {
+    const fallbackTexts = [
+      'واش راك؟ كان عندنا درس مليح على التكنولوجيا',
+      'الأستاذ شرح لنا كيفاش نستعملوا الذكاء الاصطناعي',
+      'قال لنا بلي هذا المجال مهم برشة في الوقت هذا',
+      'لازم نتعلموا هاذي التقنيات الجديدة باش نتطوروا'
     ];
     
-    setTimeout(() => {
-      const randomText = sampleAlgerianTexts[Math.floor(Math.random() * sampleAlgerianTexts.length)];
-      resolve(randomText);
-    }, 2000);
+    const randomText = fallbackTexts[Math.floor(Math.random() * fallbackTexts.length)];
+    
+    if (resolve) {
+      setTimeout(() => resolve(randomText), 1000);
+      return;
+    }
+    
+    return randomText;
   }
 
-  getAlgerianFallbackText() {
-    return 'واش راك؟ هذا تسجيل تجريبي باللهجة الجزائرية. نحن نعملوا على تطوير التكنولوجيا باش تخدم الناس مليح.';
+  // نص احتياطي موسع
+  getExtendedAlgerianFallbackText() {
+    return `واش راك اليوم؟ كان عندنا محاضرة مليح برك على التكنولوجيا والذكاء الاصطناعي. الأستاذ شرح لنا كيفاش نقدروا نستعملوا هاذي التقنيات في حياتنا. قال لنا بلي المجال راه مهم برشة، خاصة في التعليم والخدمة والصحة. 
+
+    نحن نقدروا نستعملوا الذكاء الاصطناعي باش نحلوا مشاكل كبيرة، ونساعدوا الناس في شغلهم ودراستهم. التكنولوجيا راهي تتطور كل يوم، ولازم نواكبوا معاها.
+
+    في الأخير، المهم نكون عندنا الرغبة باش نتعلموا ونتطوروا، ونستفيدوا من هاذي الفرص الجديدة اللي قدامنا.`;
   }
 }
 

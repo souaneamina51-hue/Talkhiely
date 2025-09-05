@@ -33,6 +33,7 @@ const SummaryInterface = ({ trialStatus }) => {
   const [summary, setSummary] = useState('');
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaries, setSummaries] = useState([]);
+  const [processingProgress, setProcessingProgress] = useState(null);
   
   // معالجات اللهجة الجزائرية
   const [audioProcessor] = useState(() => new AlgerianAudioProcessor());
@@ -79,21 +80,31 @@ const SummaryInterface = ({ trialStatus }) => {
     if (!mediaBlobUrl) return;
 
     setIsProcessing(true);
+    setProcessingProgress(null);
 
     try {
-      console.log('🎤 بدء معالجة الصوت باللهجة الجزائرية...');
+      console.log('🎤 بدء معالجة الصوت باللهجة الجزائرية المحسّنة...');
       
       // تحويل URL إلى Blob
       const response = await fetch(mediaBlobUrl);
       const audioBlob = await response.blob();
       
-      // معالجة الصوت باللهجة الجزائرية
-      const extractedText = await audioProcessor.processAudioBlob(audioBlob);
+      // معالجة الصوت مع عرض التقدم
+      const extractedText = await audioProcessor.processAudioBlob(
+        audioBlob,
+        (progress) => {
+          setProcessingProgress({
+            ...progress,
+            message: this.getProgressMessage(progress)
+          });
+        }
+      );
       
       setTranscribedText(extractedText);
       console.log('📝 النص المستخرج باللهجة الجزائرية:', extractedText);
 
-      // تلخيص النص الجزائري
+      // إخفاء شريط التقدم والبدء في التلخيص
+      setProcessingProgress(null);
       await summarizeText(extractedText);
 
       setIsProcessing(false);
@@ -104,8 +115,24 @@ const SummaryInterface = ({ trialStatus }) => {
       const fallbackText = 'واش راك اليوم؟ كان عندنا محاضرة مليح على التكنولوجيا والذكاء الاصطناعي. الأستاذ شرح لنا كيفاش نقدروا نستعملوا هذا الشي في حياتنا. قال لنا بلي مهم برشة نتعلموا على هاذي التقنيات الجديدة باش نتطوروا في شغلنا ودراستنا.';
       
       setTranscribedText(fallbackText);
+      setProcessingProgress(null);
       await summarizeText(fallbackText);
       setIsProcessing(false);
+    }
+  };
+
+  const getProgressMessage = (progress) => {
+    switch (progress.stage) {
+      case 'splitting':
+        return 'جاري تقسيم التسجيل إلى مقاطع...';
+      case 'processing':
+        return `معالجة المقطع ${progress.current} من ${progress.total}...`;
+      case 'merging':
+        return 'دمج النصوص المستخرجة...';
+      case 'complete':
+        return 'تمت المعالجة بنجاح!';
+      default:
+        return 'جاري المعالجة...';
     }
   };
 
@@ -404,14 +431,43 @@ ${summary.transcribedText}
           {/* Processing Alerts */}
           {isProcessing && (
             <Alert status="warning" borderRadius="lg">
-              <VStack align="start" spacing={2} w="full">
+              <VStack align="start" spacing={3} w="full">
                 <Text fontWeight="bold">
                   {isAlgerianMode ? '🔄 جاري تحويل الصوت الجزائري إلى نص...' : '🔄 جاري تحويل الصوت إلى نص...'}
                 </Text>
-                <Text fontSize="sm" color="orange.600">
-                  {isAlgerianMode ? 'نحن نعالجوا الكلام بالدارجة الجزائرية' : 'معالجة الكلام بالعربية الفصحى'}
-                </Text>
-                <Progress size="sm" isIndeterminate colorScheme="orange" w="full" />
+                
+                {processingProgress ? (
+                  <VStack align="start" spacing={2} w="full">
+                    <Text fontSize="sm" color="orange.700" fontWeight="semibold">
+                      {processingProgress.message}
+                    </Text>
+                    {processingProgress.stage === 'processing' && (
+                      <HStack w="full" spacing={2}>
+                        <Progress
+                          value={(processingProgress.current / processingProgress.total) * 100}
+                          colorScheme="orange"
+                          size="md"
+                          w="full"
+                          hasStripe
+                          isAnimated
+                        />
+                        <Text fontSize="xs" color="orange.600" minW="60px">
+                          {processingProgress.current}/{processingProgress.total}
+                        </Text>
+                      </HStack>
+                    )}
+                    {processingProgress.stage !== 'processing' && (
+                      <Progress size="sm" isIndeterminate colorScheme="orange" w="full" />
+                    )}
+                  </VStack>
+                ) : (
+                  <VStack align="start" spacing={2} w="full">
+                    <Text fontSize="sm" color="orange.600">
+                      {isAlgerianMode ? 'نحن نعالجوا الكلام بالدارجة الجزائرية مع دعم التسجيلات الطويلة' : 'معالجة الكلام بالعربية الفصحى'}
+                    </Text>
+                    <Progress size="sm" isIndeterminate colorScheme="orange" w="full" />
+                  </VStack>
+                )}
               </VStack>
             </Alert>
           )}
