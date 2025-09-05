@@ -63,12 +63,36 @@ const SummaryInterface = ({ trialStatus }) => {
     return () => clearInterval(interval);
   }, [isActive, status, timer]);
 
-  const handleStart = () => {
-    setIsActive(true);
-    setTimer(0);
-    setTranscribedText('');
-    setSummary('');
-    startRecording();
+  const handleStart = async () => {
+    try {
+      // التحقق من دعم التعرف على الكلام
+      const isSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+      
+      if (!isSupported) {
+        alert('متصفحك لا يدعم ميزة التعرف على الكلام. يرجى استخدام Google Chrome أو Safari.');
+        return;
+      }
+
+      // طلب أذونات الميكروفون
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log('✅ تم الحصول على إذن الميكروفون');
+      } catch (permError) {
+        alert('يرجى السماح بالوصول للميكروفون لتسجيل الصوت');
+        console.error('❌ خطأ في أذونات الميكروفون:', permError);
+        return;
+      }
+
+      setIsActive(true);
+      setTimer(0);
+      setTranscribedText('');
+      setSummary('');
+      console.log('🎤 بدء التسجيل...');
+      startRecording();
+    } catch (error) {
+      console.error('❌ خطأ في بدء التسجيل:', error);
+      alert('حدث خطأ في بدء التسجيل. يرجى المحاولة مرة أخرى.');
+    }
   };
 
   const handleStop = async () => {
@@ -77,7 +101,10 @@ const SummaryInterface = ({ trialStatus }) => {
   };
 
   const sendAudioToAPI = async () => {
-    if (!mediaBlobUrl) return;
+    if (!mediaBlobUrl) {
+      console.error('❌ لا يوجد تسجيل صوتي للمعالجة');
+      return;
+    }
 
     setIsProcessing(true);
     setProcessingProgress(null);
@@ -85,9 +112,28 @@ const SummaryInterface = ({ trialStatus }) => {
     try {
       console.log('🎤 بدء معالجة الصوت باللهجة الجزائرية المحسّنة...');
       
+      // فحص دعم التعرف على الكلام
+      const isSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+      console.log('🔍 دعم التعرف على الكلام:', isSupported);
+
+      if (!isSupported) {
+        console.warn('⚠️ المتصفح لا يدعم التعرف على الكلام');
+        throw new Error('المتصفح لا يدعم التعرف على الكلام');
+      }
+
+      // فحص أذونات الميكروفون
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log('✅ تم الحصول على إذن الميكروفون');
+      } catch (permError) {
+        console.warn('⚠️ لم يتم الحصول على إذن الميكروفون:', permError);
+      }
+      
       // تحويل URL إلى Blob
       const response = await fetch(mediaBlobUrl);
       const audioBlob = await response.blob();
+      
+      console.log('📊 حجم الملف الصوتي:', Math.round(audioBlob.size / 1024), 'KB');
       
       // معالجة الصوت مع عرض التقدم
       const extractedText = await audioProcessor.processAudioBlob(
@@ -95,21 +141,31 @@ const SummaryInterface = ({ trialStatus }) => {
         (progress) => {
           setProcessingProgress({
             ...progress,
-            message: this.getProgressMessage(progress)
+            message: getProgressMessage(progress)
           });
         }
       );
       
+      if (!extractedText || extractedText.length < 5) {
+        console.warn('⚠️ النص المستخرج قصير جداً أو فارغ');
+        throw new Error('فشل في استخراج النص من التسجيل');
+      }
+      
       setTranscribedText(extractedText);
-      console.log('📝 النص المستخرج باللهجة الجزائرية:', extractedText);
+      console.log('📝 النص المستخرج بنجاح:', extractedText);
 
       // إخفاء شريط التقدم والبدء في التلخيص
       setProcessingProgress(null);
       await summarizeText(extractedText);
 
       setIsProcessing(false);
+      console.log('✅ تمت معالجة الصوت والتلخيص بنجاح');
+      
     } catch (error) {
       console.error('❌ خطأ في معالجة الصوت الجزائري:', error);
+      
+      // عرض رسالة خطأ للمستخدم
+      alert(`فشل في التعرف على الكلام: ${error.message}. سيتم استخدام نص احتياطي.`);
       
       // نص احتياطي باللهجة الجزائرية
       const fallbackText = 'واش راك اليوم؟ كان عندنا محاضرة مليح على التكنولوجيا والذكاء الاصطناعي. الأستاذ شرح لنا كيفاش نقدروا نستعملوا هذا الشي في حياتنا. قال لنا بلي مهم برشة نتعلموا على هاذي التقنيات الجديدة باش نتطوروا في شغلنا ودراستنا.';

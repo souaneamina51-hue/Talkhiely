@@ -17,14 +17,17 @@ class AlgerianAudioProcessor {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     this.recognition = new SpeechRecognition();
     
-    // إعدادات محسّنة للهجة الجزائرية
-    this.recognition.lang = 'ar-DZ'; // الجزائر
+    // إعدادات محسّنة للهجة الجزائرية والعربية
+    this.recognition.lang = 'ar-SA'; // العربية السعودية (أفضل دعم للعربية)
     this.recognition.continuous = true;
     this.recognition.interimResults = true;
-    this.recognition.maxAlternatives = 3;
+    this.recognition.maxAlternatives = 1;
     
-    // إعدادات محسّنة للهجة المحلية
-    this.recognition.grammars = this.createAlgerianGrammar();
+    // إعدادات إضافية لتحسين الأداء
+    this.recognition.audioTrack = true;
+    this.recognition.serviceURI = null;
+    
+    console.log('🔧 تم إعداد التعرف على الكلام للغة العربية');
   }
 
   createAlgerianGrammar() {
@@ -191,63 +194,95 @@ class AlgerianAudioProcessor {
   async processSingleChunk(audioBlob) {
     return new Promise((resolve, reject) => {
       if (!this.isSupported) {
-        return this.getAlgerianFallbackTextForChunk(resolve);
+        console.warn('⚠️ التعرف على الكلام غير مدعوم في هذا المتصفح');
+        return resolve(this.getAlgerianFallbackTextForChunk());
       }
 
-      const audioURL = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioURL);
+      console.log('🎤 بدء التعرف على الكلام للمقطع...');
       
       let finalTranscript = '';
       let timeoutId = null;
+      let hasStarted = false;
 
       const cleanup = () => {
         if (timeoutId) clearTimeout(timeoutId);
-        URL.revokeObjectURL(audioURL);
-        this.recognition.stop();
+        try {
+          this.recognition.stop();
+        } catch (e) {
+          console.log('تم إيقاف التعرف بالفعل');
+        }
+      };
+
+      // إعداد التعرف من جديد لكل مقطع
+      this.setupRecognition();
+
+      this.recognition.onstart = () => {
+        console.log('✅ بدأ التعرف على الكلام');
+        hasStarted = true;
       };
 
       this.recognition.onresult = (event) => {
-        let chunkTranscript = '';
+        console.log('📝 تم استلام نتيجة التعرف على الكلام');
+        let currentTranscript = '';
         
         for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
+          const transcript = event.results[i][0].transcript.trim();
           
-          if (event.results[i].isFinal) {
-            finalTranscript += this.enhanceAlgerianText(transcript) + ' ';
-          } else {
-            chunkTranscript += transcript;
+          if (transcript && transcript.length > 0) {
+            if (event.results[i].isFinal) {
+              finalTranscript += this.enhanceAlgerianText(transcript) + ' ';
+              console.log('✅ نص نهائي:', transcript);
+            } else {
+              currentTranscript += transcript;
+              console.log('⏳ نص مؤقت:', transcript);
+            }
           }
         }
       };
 
       this.recognition.onerror = (event) => {
-        console.warn('خطأ في التعرف على المقطع:', event.error);
+        console.error('❌ خطأ في التعرف على الكلام:', event.error);
         cleanup();
-        this.getAlgerianFallbackTextForChunk(resolve);
+        
+        // في حالة الخطأ، إرجاع النص المستخرج حتى الآن أو النص الاحتياطي
+        const result = finalTranscript.trim() || this.getAlgerianFallbackTextForChunk();
+        resolve(this.enhanceAlgerianText(result));
       };
 
       this.recognition.onend = () => {
+        console.log('🔚 انتهى التعرف على الكلام');
         cleanup();
-        const processedText = finalTranscript.trim() || this.getAlgerianFallbackTextForChunk();
-        resolve(this.enhanceAlgerianText(processedText));
+        
+        const result = finalTranscript.trim();
+        if (result && result.length > 5) {
+          console.log('✅ تم استخراج النص بنجاح:', result);
+          resolve(this.enhanceAlgerianText(result));
+        } else {
+          console.log('⚠️ لم يتم استخراج نص، استخدام النص الاحتياطي');
+          resolve(this.getAlgerianFallbackTextForChunk());
+        }
       };
 
-      // تشغيل الصوت والتعرف عليه
-      audio.play();
-      this.recognition.start();
+      try {
+        this.recognition.start();
+        console.log('🚀 تم بدء التعرف على الكلام');
+      } catch (error) {
+        console.error('❌ فشل في بدء التعرف على الكلام:', error);
+        return resolve(this.getAlgerianFallbackTextForChunk());
+      }
       
-      // مهلة زمنية للمقطع الواحد (35 ثانية)
+      // مهلة زمنية للمقطع الواحد (30 ثانية)
       timeoutId = setTimeout(() => {
+        console.log('⏰ انتهت المهلة الزمنية للتعرف');
         cleanup();
-        resolve(finalTranscript.trim() || this.getAlgerianFallbackTextForChunk());
-      }, 35000);
-
-      // إيقاف التعرف بعد انتهاء الصوت
-      audio.onended = () => {
-        setTimeout(() => {
-          this.recognition.stop();
-        }, 1000);
-      };
+        
+        const result = finalTranscript.trim();
+        if (result && result.length > 5) {
+          resolve(this.enhanceAlgerianText(result));
+        } else {
+          resolve(this.getAlgerianFallbackTextForChunk());
+        }
+      }, 30000);
     });
   }
 
