@@ -70,7 +70,7 @@ externalPort = 8008
 expertMode = true
 
 [workflows]
-runButton = "تشغيل التطبيق الكامل"
+runButton = "تشغيل كامل محدث"
 
 [[workflows.workflow]]
 name = "Project"
@@ -127,3 +127,16 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node server.js"
+
+[[workflows.workflow]]
+name = "تشغيل كامل محدث"
+author = 47183547
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node server.js"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
