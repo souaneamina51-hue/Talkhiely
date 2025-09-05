@@ -2,9 +2,14 @@
 // server.js
 
 // 1. استيراد المكتبات اللازمة
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
+import express from 'express';
+import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// للحصول على __dirname في ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // 2. إعداد التطبيق والمنفذ
 const app = express();
@@ -66,6 +71,6 @@ app.get('*', (req, res) => {
 });
 
 // 8. تشغيل الخادم
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`الخادم يعمل على المنفذ: ${PORT}`);
 });
