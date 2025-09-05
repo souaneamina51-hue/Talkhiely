@@ -103,6 +103,7 @@ const SummaryInterface = ({ trialStatus }) => {
   const sendAudioToAPI = async () => {
     if (!mediaBlobUrl) {
       console.error('❌ لا يوجد تسجيل صوتي للمعالجة');
+      alert('لا يوجد تسجيل صوتي. يرجى تسجيل الصوت أولاً.');
       return;
     }
 
@@ -110,7 +111,7 @@ const SummaryInterface = ({ trialStatus }) => {
     setProcessingProgress(null);
 
     try {
-      console.log('🎤 بدء معالجة الصوت باللهجة الجزائرية الفعلية...');
+      console.log('🎤 بدء معالجة الصوت باللهجة الجزائرية...');
       
       // التحقق من دعم التعرف على الكلام
       const isSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
@@ -118,20 +119,9 @@ const SummaryInterface = ({ trialStatus }) => {
 
       if (!isSupported) {
         console.warn('⚠️ المتصفح لا يدعم التعرف على الكلام');
-        throw new Error('يرجى استخدام Google Chrome أو Safari للحصول على أفضل دعم للتعرف على الكلام');
+        throw new Error('يرجى استخدام Google Chrome أو Microsoft Edge للحصول على أفضل دعم للتعرف على الكلام');
       }
 
-      // التحقق من أذونات الميكروفون (مطلوبة للتعرف على الكلام)
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        console.log('✅ تم الحصول على إذن الميكروفون');
-        // إيقاف المسار فوراً لأننا لا نحتاجه للتسجيل
-        stream.getTracks().forEach(track => track.stop());
-      } catch (permError) {
-        console.error('❌ خطأ في أذونات الميكروفون:', permError);
-        throw new Error('يرجى السماح بالوصول للميكروفون لتمكين التعرف على الكلام');
-      }
-      
       // تحويل URL إلى Blob
       const response = await fetch(mediaBlobUrl);
       const audioBlob = await response.blob();
@@ -140,74 +130,138 @@ const SummaryInterface = ({ trialStatus }) => {
       console.log('📊 نوع الملف الصوتي:', audioBlob.type);
       
       // التحقق من صحة الملف الصوتي
-      if (audioBlob.size === 0) {
-        throw new Error('الملف الصوتي فارغ أو تالف');
+      if (audioBlob.size < 1000) { // أقل من 1KB
+        throw new Error('الملف الصوتي صغير جداً أو تالف. يرجى إعادة التسجيل.');
       }
       
       // عرض رسالة التقدم
       setProcessingProgress({
-        current: 0,
+        current: 10,
         total: 100,
         stage: 'preparing',
-        message: 'تحضير الملف الصوتي للتعرف على الكلام...'
+        message: 'تحضير التعرف على الكلام باللهجة الجزائرية...'
       });
       
-      // معالجة الصوت مع عرض التقدم التفصيلي
-      const extractedText = await audioProcessor.processAudioBlob(
-        audioBlob,
-        (progress) => {
-          console.log('📊 تقدم المعالجة:', progress);
-          setProcessingProgress({
-            ...progress,
-            message: getProgressMessage(progress)
-          });
-        }
-      );
+      // تحديد مدة التسجيل
+      const audioDuration = await getAudioDuration(audioBlob);
+      console.log('⏱️ مدة التسجيل:', audioDuration, 'ثانية');
       
-      console.log('📝 النص المستخرج من التعرف الفعلي:', extractedText);
+      let extractedText = '';
       
-      // التحقق من جودة النص المستخرج
-      if (!extractedText || extractedText.length < 10) {
-        console.warn('⚠️ النص المستخرج قصير جداً أو فارغ');
-        throw new Error('لم يتم التعرف على كلام واضح في التسجيل. تأكد من وضوح الصوت وجودة التسجيل.');
+      if (audioDuration > 30) {
+        console.log('📋 تسجيل طويل، تقسيم إلى مقاطع...');
+        // معالجة التسجيلات الطويلة
+        extractedText = await audioProcessor.processAudioBlob(
+          audioBlob,
+          (progress) => {
+            console.log('📊 تقدم المعالجة:', progress);
+            setProcessingProgress({
+              ...progress,
+              message: getProgressMessage(progress)
+            });
+          }
+        );
+      } else {
+        console.log('📋 تسجيل قصير، معالجة مباشرة...');
+        setProcessingProgress({
+          current: 50,
+          total: 100,
+          stage: 'processing',
+          message: 'التعرف على الكلام الجزائري...'
+        });
+        
+        // معالجة مباشرة للتسجيلات القصيرة
+        extractedText = await audioProcessor.processSingleChunk(audioBlob);
       }
       
-      // التحقق من أن النص ليس النص الاحتياطي
-      const fallbackIndicators = [
-        'واش راك اليوم؟ كان عندنا محاضرة مليح برك',
-        'هذا نص تجريبي',
-        'نص احتياطي',
-        'الموضوع يتكلم على حاجات مهمة'
-      ];
+      console.log('📝 النص المستخرج:', extractedText);
       
-      const isActualSpeech = !fallbackIndicators.some(indicator => 
-        extractedText.includes(indicator)
-      );
+      // التحقق الصارم من جودة النص
+      const isValidText = validateExtractedText(extractedText);
       
-      if (!isActualSpeech) {
-        console.warn('⚠️ تم استخدام النص الاحتياطي، يجب إعادة المحاولة');
-        throw new Error('فشل في التعرف على الكلام الفعلي. يرجى إعادة التسجيل بوضوح أكبر.');
+      if (!isValidText.isValid) {
+        console.warn('⚠️ النص المستخرج غير صالح:', isValidText.reason);
+        throw new Error(`فشل في التعرف على الكلام: ${isValidText.reason}\n\nيرجى:\n• التحدث بوضوح أكبر\n• تجنب الضوضاء الخلفية\n• إعادة المحاولة في مكان هادئ`);
       }
       
       setTranscribedText(extractedText);
-      console.log('✅ تم استخراج النص الفعلي بنجاح:', extractedText.substring(0, 100) + '...');
+      console.log('✅ تم استخراج النص بنجاح');
 
       // إخفاء شريط التقدم والبدء في التلخيص
-      setProcessingProgress(null);
+      setProcessingProgress({
+        current: 90,
+        total: 100,
+        stage: 'summarizing',
+        message: 'تلخيص النص باللهجة الجزائرية...'
+      });
+      
       await summarizeText(extractedText);
-
+      
+      setProcessingProgress(null);
       setIsProcessing(false);
       console.log('✅ تمت معالجة الصوت والتلخيص بنجاح');
       
     } catch (error) {
       console.error('❌ خطأ في معالجة الصوت:', error);
       setProcessingProgress(null);
-      
-      // عرض رسالة خطأ مفصلة للمستخدم
-      alert(`تعذر التعرف على الكلام: ${error.message}\n\nنصائح:\n- تأكد من وضوح الكلام في التسجيل\n- تجنب الضوضاء الخلفية\n- استخدم متصفح Chrome للحصول على أفضل دعم\n- تأكد من السماح بالوصول للميكروفون`);
-      
       setIsProcessing(false);
+      
+      // عرض رسالة خطأ مفصلة
+      alert(`فشل في معالجة التسجيل:\n${error.message}`);
     }
+  };
+
+  // دالة للحصول على مدة الصوت
+  const getAudioDuration = (audioBlob) => {
+    return new Promise((resolve) => {
+      const audio = new Audio(URL.createObjectURL(audioBlob));
+      audio.addEventListener('loadedmetadata', () => {
+        resolve(audio.duration || 0);
+      });
+      audio.addEventListener('error', () => {
+        resolve(0);
+      });
+    });
+  };
+
+  // دالة للتحقق من صحة النص المستخرج
+  const validateExtractedText = (text) => {
+    if (!text || typeof text !== 'string') {
+      return { isValid: false, reason: 'النص فارغ أو غير صالح' };
+    }
+    
+    const trimmedText = text.trim();
+    
+    if (trimmedText.length < 5) {
+      return { isValid: false, reason: 'النص قصير جداً (أقل من 5 أحرف)' };
+    }
+    
+    // التحقق من أن النص ليس احتياطي
+    const fallbackIndicators = [
+      'واش راك اليوم؟ كان عندنا محاضرة مليح برك',
+      'هذا نص تجريبي',
+      'نص احتياطي',
+      'الموضوع يتكلم على حاجات مهمة',
+      'كان عندنا درس مليح على التكنولوجيا',
+      '[مقطع',
+      'تعذر المعالجة'
+    ];
+    
+    const containsFallback = fallbackIndicators.some(indicator => 
+      trimmedText.includes(indicator)
+    );
+    
+    if (containsFallback) {
+      return { isValid: false, reason: 'تم استخدام نص احتياطي - لم يتم التعرف على الكلام الفعلي' };
+    }
+    
+    // التحقق من وجود محتوى عربي
+    const arabicRegex = /[\u0600-\u06FF]/;
+    if (!arabicRegex.test(trimmedText)) {
+      return { isValid: false, reason: 'النص لا يحتوي على كلمات عربية' };
+    }
+    
+    return { isValid: true, reason: 'النص صالح' };
   };
 
   const getProgressMessage = (progress) => {
