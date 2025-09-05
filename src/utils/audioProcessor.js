@@ -17,17 +17,22 @@ class AlgerianAudioProcessor {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     this.recognition = new SpeechRecognition();
     
-    // إعدادات محسّنة للهجة الجزائرية والعربية
-    this.recognition.lang = 'ar-SA'; // العربية السعودية (أفضل دعم للعربية)
+    // إعدادات محسّنة للتعرف على العربية والجزائرية
+    this.recognition.lang = 'ar-DZ'; // الجزائر أولاً
     this.recognition.continuous = true;
     this.recognition.interimResults = true;
-    this.recognition.maxAlternatives = 1;
+    this.recognition.maxAlternatives = 3; // المزيد من البدائل للدقة
     
-    // إعدادات إضافية لتحسين الأداء
-    this.recognition.audioTrack = true;
-    this.recognition.serviceURI = null;
+    // إعدادات متقدمة للتحسين
+    if ('webkitSpeechRecognition' in window) {
+      this.recognition.webkitGrammar = this.createAlgerianGrammar();
+    }
     
-    console.log('🔧 تم إعداد التعرف على الكلام للغة العربية');
+    console.log('🔧 تم إعداد التعرف على الكلام للهجة الجزائرية');
+    
+    // إعداد قائمة احتياطية من اللغات للتجربة
+    this.fallbackLanguages = ['ar-DZ', 'ar-SA', 'ar-EG', 'ar-MA', 'ar'];
+    this.currentLangIndex = 0;
   }
 
   createAlgerianGrammar() {
@@ -190,7 +195,7 @@ class AlgerianAudioProcessor {
     return combinedText;
   }
 
-  // معالجة مقطع واحد
+  // معالجة مقطع واحد باستخدام Web Speech API مع تشغيل الصوت
   async processSingleChunk(audioBlob) {
     return new Promise((resolve, reject) => {
       if (!this.isSupported) {
@@ -198,14 +203,19 @@ class AlgerianAudioProcessor {
         return resolve(this.getAlgerianFallbackTextForChunk());
       }
 
-      console.log('🎤 بدء التعرف على الكلام للمقطع...');
+      console.log('🎤 بدء التعرف على الكلام للمقطع الصوتي...');
       
       let finalTranscript = '';
       let timeoutId = null;
-      let hasStarted = false;
+      let audio = null;
+      let hasRecognitionStarted = false;
 
       const cleanup = () => {
         if (timeoutId) clearTimeout(timeoutId);
+        if (audio) {
+          audio.pause();
+          audio.src = '';
+        }
         try {
           this.recognition.stop();
         } catch (e) {
@@ -216,37 +226,57 @@ class AlgerianAudioProcessor {
       // إعداد التعرف من جديد لكل مقطع
       this.setupRecognition();
 
+      // إعداد التعرف على الكلام
       this.recognition.onstart = () => {
         console.log('✅ بدأ التعرف على الكلام');
-        hasStarted = true;
+        hasRecognitionStarted = true;
+        
+        // تشغيل الصوت بعد بدء التعرف
+        try {
+          const audioUrl = URL.createObjectURL(audioBlob);
+          audio = new Audio(audioUrl);
+          audio.volume = 1.0;
+          audio.play().then(() => {
+            console.log('🔊 بدأ تشغيل الصوت للتعرف عليه');
+          }).catch(error => {
+            console.error('❌ فشل في تشغيل الصوت:', error);
+          });
+        } catch (error) {
+          console.error('❌ خطأ في إنشاء ملف الصوت:', error);
+        }
       };
 
       this.recognition.onresult = (event) => {
         console.log('📝 تم استلام نتيجة التعرف على الكلام');
-        let currentTranscript = '';
         
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript.trim();
+          const confidence = event.results[i][0].confidence;
           
           if (transcript && transcript.length > 0) {
+            console.log(`📋 نص مستخرج: "${transcript}" (الثقة: ${confidence?.toFixed(2) || 'غير محدد'})`);
+            
             if (event.results[i].isFinal) {
-              finalTranscript += this.enhanceAlgerianText(transcript) + ' ';
-              console.log('✅ نص نهائي:', transcript);
-            } else {
-              currentTranscript += transcript;
-              console.log('⏳ نص مؤقت:', transcript);
+              finalTranscript += transcript + ' ';
+              console.log('✅ نص نهائي مؤكد:', transcript);
             }
           }
         }
       };
 
       this.recognition.onerror = (event) => {
-        console.error('❌ خطأ في التعرف على الكلام:', event.error);
+        console.error('❌ خطأ في التعرف على الكلام:', event.error, event);
         cleanup();
         
-        // في حالة الخطأ، إرجاع النص المستخرج حتى الآن أو النص الاحتياطي
-        const result = finalTranscript.trim() || this.getAlgerianFallbackTextForChunk();
-        resolve(this.enhanceAlgerianText(result));
+        // محاولة استخدام النص المستخرج حتى الآن
+        const result = finalTranscript.trim();
+        if (result && result.length > 3) {
+          console.log('🔄 استخدام النص الجزئي المستخرج:', result);
+          resolve(this.enhanceAlgerianText(result));
+        } else {
+          console.log('🔄 استخدام النص الاحتياطي بسبب الخطأ');
+          resolve(this.getAlgerianFallbackTextForChunk());
+        }
       };
 
       this.recognition.onend = () => {
@@ -254,35 +284,39 @@ class AlgerianAudioProcessor {
         cleanup();
         
         const result = finalTranscript.trim();
-        if (result && result.length > 5) {
+        if (result && result.length > 3) {
           console.log('✅ تم استخراج النص بنجاح:', result);
           resolve(this.enhanceAlgerianText(result));
         } else {
-          console.log('⚠️ لم يتم استخراج نص، استخدام النص الاحتياطي');
+          console.log('⚠️ لم يتم استخراج نص مناسب، استخدام النص الاحتياطي');
           resolve(this.getAlgerianFallbackTextForChunk());
         }
       };
 
+      // بدء التعرف على الكلام
       try {
+        console.log('🚀 محاولة بدء التعرف على الكلام...');
         this.recognition.start();
-        console.log('🚀 تم بدء التعرف على الكلام');
       } catch (error) {
         console.error('❌ فشل في بدء التعرف على الكلام:', error);
+        cleanup();
         return resolve(this.getAlgerianFallbackTextForChunk());
       }
       
-      // مهلة زمنية للمقطع الواحد (30 ثانية)
+      // مهلة زمنية أطول للتعرف الفعلي (45 ثانية)
       timeoutId = setTimeout(() => {
         console.log('⏰ انتهت المهلة الزمنية للتعرف');
         cleanup();
         
         const result = finalTranscript.trim();
-        if (result && result.length > 5) {
+        if (result && result.length > 3) {
+          console.log('⏰ استخدام النص المستخرج قبل انتهاء الوقت:', result);
           resolve(this.enhanceAlgerianText(result));
         } else {
+          console.log('⏰ استخدام النص الاحتياطي بسبب انتهاء الوقت');
           resolve(this.getAlgerianFallbackTextForChunk());
         }
-      }, 30000);
+      }, 45000);
     });
   }
 
