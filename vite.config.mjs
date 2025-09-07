@@ -9,10 +9,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0',
-    port: process.env.PORT || 3000,
-    // هذا السطر هو الحل لمشكلة "Blocked request"
-    allowedHosts: [
-      '923d31db-62ba-4b40-93ae-34d9f25e7d1a-00-33iew8wl8t2w5.kirk.replit.dev'
-    ]
+    port: 5000,
+    allowedHosts: true
   }
 })
