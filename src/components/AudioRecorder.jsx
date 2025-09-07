@@ -12,7 +12,7 @@ import {
   useColorModeValue
 } from '@chakra-ui/react';
 
-const AudioRecorder = ({ onNewSummary, trialStatus }) => {
+const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [timer, setTimer] = useState(0);
   const [processingChunks, setProcessingChunks] = useState(0);
@@ -97,6 +97,11 @@ const AudioRecorder = ({ onNewSummary, trialStatus }) => {
       setTimer(0);
       setRecordedChunks(0);
       setProcessingChunks(0);
+      
+      // إخبار المكون الأب بتغيير حالة التسجيل
+      if (onRecordingStateChange) {
+        onRecordingStateChange(true);
+      }
 
       // تشغيل مؤقت التقسيم
       startChunkTimer();
@@ -245,6 +250,11 @@ const AudioRecorder = ({ onNewSummary, trialStatus }) => {
 
   const stopRecording = () => {
     setIsRecording(false);
+    
+    // إخبار المكون الأب بتغيير حالة التسجيل
+    if (onRecordingStateChange) {
+      onRecordingStateChange(false);
+    }
     
     // إيقاف مؤقت التقسيم
     if (chunkTimerRef.current) {
