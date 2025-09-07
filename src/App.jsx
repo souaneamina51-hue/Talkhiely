@@ -4,38 +4,12 @@ import { ChakraProvider } from '@chakra-ui/react';
 import SummaryInterface from './components/SummaryInterface';
 import AuthInterface from './components/AuthInterface';
 import { useTrialPeriod } from './hooks/useTrialPeriod';
-import {
-  Box,
-  Spinner,
-  VStack,
-  Text,
-  Container
-} from '@chakra-ui/react';
-
-const LoadingScreen = () => (
-  <Box minH="100vh" display="flex" alignItems="center" justifyContent="center">
-    <Container textAlign="center">
-      <VStack spacing={4}>
-        <Spinner size="xl" color="blue.500" thickness="4px" />
-        <Text fontSize="lg" color="gray.600">
-          جاري التحقق من حالة حسابك...
-        </Text>
-      </VStack>
-    </Container>
-  </Box>
-);
 
 const App = () => {
   const { trialStatus, isChecking, refreshTrialStatus } = useTrialPeriod();
 
-  // عرض شاشة التحميل أثناء فحص الفترة التجريبية
-  if (isChecking) {
-    return (
-      <ChakraProvider>
-        <LoadingScreen />
-      </ChakraProvider>
-    );
-  }
+  // لا عرض أي شيء أثناء فحص الفترة التجريبية
+  if (isChecking) return null;
 
   // عرض واجهة تسجيل الدخول إذا انتهت الفترة التجريبية
   if (trialStatus.status === 'expired') {
