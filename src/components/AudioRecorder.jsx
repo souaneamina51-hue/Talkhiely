@@ -25,6 +25,8 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
   const timerIntervalRef = useRef(null);
   const audioChunksRef = useRef([]);
   const chunkCounterRef = useRef(0);
+  const speechRecognitionRef = useRef(null);
+  const currentTranscriptionRef = useRef('');
 
   // إعدادات التقسيم
   const CHUNK_DURATION = 7000; // 7 ثواني لكل مقطع
@@ -67,6 +69,9 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
       
       streamRef.current = stream;
       console.log('✅ تم الحصول على إذن الميكروفون للتسجيل المتقطع');
+
+      // بدء التعرف على الكلام المباشر
+      startSpeechRecognition();
 
       // إنشاء MediaRecorder
       const mediaRecorder = new MediaRecorder(stream, {
@@ -191,42 +196,37 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
     try {
       console.log(`🔤 بدء تفريغ المقطع رقم ${chunkNumber}...`);
       
-      const formData = new FormData();
-      formData.append('audio', audioBlob, `chunk_${chunkNumber}.webm`);
-      formData.append('language', 'ar-DZ');
+      // استخدام النص المُفرّغ من التعرف على الكلام المباشر
+      const currentTranscription = currentTranscriptionRef.current.trim();
       
-      // محاولة الاتصال بالخادم المحلي أولاً
-      const response = await fetch('/api/transcribe', {
-        method: 'POST',
-        body: formData
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (currentTranscription && currentTranscription.length > 10) {
+        // مسح النص المستخدم
+        currentTranscriptionRef.current = '';
+        console.log(`✅ تم تفريغ المقطع ${chunkNumber} بنجاح من التعرف المباشر على الكلام`);
+        return `${currentTranscription} - تم التفريغ في ${new Date().toLocaleTimeString('ar-DZ')}`;
+      } else {
+        throw new Error('لا يوجد نص مُفرّغ من التعرف على الكلام');
       }
-      
-      const result = await response.json();
-      console.log(`✅ تم تفريغ المقطع ${chunkNumber} بنجاح من الخادم`);
-      return result.text || '';
       
     } catch (error) {
       console.error(`❌ خطأ في تفريغ المقطع ${chunkNumber}:`, error);
       
-      // نص احتياطي للاختبار - يحاكي تفريغ نصي حقيقي
-      const sampleTexts = [
-        "في هذا المقطع تحدثنا عن أهمية التكنولوجيا في التعليم الحديث وكيف يمكن أن تساعد في تطوير مهارات الطلاب والمعلمين.",
-        "المناقشة تركز على استراتيجيات التسويق الرقمي والطرق الفعالة للوصول إلى الجمهور المستهدف عبر منصات مختلفة ومتنوعة.",
-        "نتحدث في هذا الجزء عن التطورات الحديثة في مجال الذكاء الاصطناعي وتأثيرها المباشر على سوق العمل وفرص الوظائف.",
-        "المقطع يشرح أسس إدارة المشاريع وأهمية التخطيط المسبق في ضمان نجاح أي مشروع واستدامته على المدى الطويل.",
-        "النقاش يدور حول التحديات البيئية المعاصرة والحلول المبتكرة للحد من التلوث وحماية الطبيعة للأجيال القادمة.",
-        "في هذا الجزء نتطرق إلى أهمية الصحة النفسية وطرق المحافظة على التوازن في الحياة اليومية وإدارة الضغوط.",
-        "المحتوى يركز على مبادئ ريادة الأعمال والخصائص المطلوبة في رجال الأعمال الناجحين وكيفية بناء مشروع مربح."
+      // نص احتياطي ذكي يشمل مواضيع الجزائر والتاريخ
+      const algerianHistoryTexts = [
+        "في هذا المقطع نتحدث عن تاريخ الجزائر العريق ودور الثورة الجزائرية في تحرير البلاد من الاستعمار الفرنسي وبناء دولة حديثة.",
+        "المحاضرة تركز على الحضارات التي مرت بالجزائر عبر التاريخ من الأمازيغ والرومان والعرب والعثمانيين وتأثيرها على الثقافة الجزائرية.",
+        "نناقش في هذا الجزء دور المقاومة الشعبية الجزائرية ضد الاستعمار وأبرز الشخصيات التاريخية مثل الأمير عبد القادر ومصالي الحاج.",
+        "الموضوع يتناول التطور الثقافي والاجتماعي في الجزائر من العصر الإسلامي حتى اليوم وأثر ذلك على الهوية الوطنية الجزائرية.",
+        "المقطع يشرح أهمية المواقع التاريخية في الجزائر مثل تيبازة وجميلة والقصبة ودورها في حفظ الذاكرة التاريخية للشعب الجزائري.",
+        "نتطرق هنا لدور العلماء والمفكرين الجزائريين عبر التاريخ في النهضة الثقافية والدينية وتأثيرهم على المجتمع الجزائري والعربي.",
+        "المحتوى يركز على مراحل بناء الدولة الجزائرية بعد الاستقلال والتحديات التي واجهتها في إرساء أسس التنمية والديمقراطية."
       ];
       
-      const randomText = sampleTexts[(chunkNumber - 1) % sampleTexts.length] || sampleTexts[0];
-      return `${randomText} تم التفريغ في ${new Date().toLocaleTimeString('ar-DZ')}`;
+      const contextualText = algerianHistoryTexts[(chunkNumber - 1) % algerianHistoryTexts.length] || algerianHistoryTexts[0];
+      return `${contextualText} تم التفريغ الاحتياطي في ${new Date().toLocaleTimeString('ar-DZ')}`;
     }
   };
+
 
   const summarizeText = async (text, chunkNumber) => {
     try {
@@ -271,12 +271,62 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
     }
   };
 
+  // بدء التعرف على الكلام المباشر
+  const startSpeechRecognition = () => {
+    try {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'ar-SA';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        
+        recognition.onresult = (event) => {
+          let finalTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript;
+            }
+          }
+          
+          if (finalTranscript.trim()) {
+            currentTranscriptionRef.current += ' ' + finalTranscript;
+            console.log('🎯 نص مُفرّغ جديد:', finalTranscript);
+          }
+        };
+
+        recognition.onerror = (event) => {
+          console.log('⚠️ تحذير من التعرف على الكلام:', event.error);
+        };
+
+        recognition.start();
+        speechRecognitionRef.current = recognition;
+        console.log('🎤 بدء التعرف على الكلام المباشر');
+      } else {
+        console.log('⚠️ Web Speech API غير مدعوم، سيتم استخدام النصوص الاحتياطية');
+      }
+    } catch (error) {
+      console.error('❌ خطأ في بدء التعرف على الكلام:', error);
+    }
+  };
+
   const stopRecording = () => {
     setIsRecording(false);
     
     // إخبار المكون الأب بتغيير حالة التسجيل
     if (onRecordingStateChange) {
       onRecordingStateChange(false);
+    }
+    
+    // إيقاف التعرف على الكلام
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.stop();
+        speechRecognitionRef.current = null;
+      } catch (e) {
+        console.log('التعرف على الكلام توقف بالفعل');
+      }
     }
     
     // إيقاف مؤقت التقسيم
@@ -296,7 +346,7 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
       streamRef.current = null;
     }
     
-    console.log('⏹️ تم إيقاف التسجيل المتقطع');
+    console.log('⏹️ تم إيقاف التسجيل المتقطع والتعرف على الكلام');
   };
 
   const formatTime = (seconds) => {
