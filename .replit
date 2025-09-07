@@ -10,9 +10,10 @@ channel = "stable-25_05"
 language = "nodejs"
 
 [deployment]
-deploymentTarget = "static"
+deploymentTarget = "vm"
 build = ["npm", "run", "build"]
 publicDir = "dist"
+run = ["npm", "run", "dev:full"]
 
 [[ports]]
 localPort = 3000
