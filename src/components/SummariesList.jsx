@@ -116,6 +116,31 @@ const SummariesList = ({ summaries = [], isRecording = false }) => {
                   📥 تصدير
                 </Button>
               </Tooltip>
+              <Tooltip label="مشاركة النقاط">
+                <Button
+                  size="sm"
+                  colorScheme="green"
+                  variant="outline"
+                  onClick={() => {
+                    const shareText = summaries
+                      .map((item, index) => `${index + 1}. ${item.summary}`)
+                      .join('\n\n');
+                    
+                    if (navigator.share) {
+                      navigator.share({
+                        title: 'ملخص التسجيل',
+                        text: shareText
+                      });
+                    } else {
+                      navigator.clipboard.writeText(shareText).then(() => {
+                        alert('✅ تم نسخ الملخص للحافظة للمشاركة');
+                      });
+                    }
+                  }}
+                >
+                  📤 مشاركة
+                </Button>
+              </Tooltip>
             </HStack>
           )}
         </Flex>
