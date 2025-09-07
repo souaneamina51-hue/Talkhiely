@@ -55,10 +55,6 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 5173
-externalPort = 80
-
-[[ports]]
 localPort = 5174
 externalPort = 3000
 
@@ -78,28 +74,7 @@ externalPort = 8080
 expertMode = true
 
 [workflows]
-runButton = "تشغيل كامل محدث"
-
-[[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "React Development Server"
-
-[[workflows.workflow]]
-name = "React Development Server"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "webview"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run dev"
-waitForPort = 5000
+runButton = "Project"
 
 [[workflows.workflow]]
 name = "Full Application"
@@ -148,3 +123,24 @@ args = "node server.js"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npm run dev"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "React Development Server"
+
+[[workflows.workflow]]
+name = "React Development Server"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev:full"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
