@@ -440,7 +440,7 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
       <VStack spacing={4}>
         <HStack justify="space-between" w="full">
           <Text fontSize="xl" fontWeight="bold" color="blue.600">
-            🎙️ التسجيل المتقطع الذكي
+            🎙️ تسجيل الصوت
           </Text>
           <Badge colorScheme={isRecording ? "red" : "gray"} variant="solid">
             {isRecording ? "🔴 مسجل" : "⏸️ متوقف"}
