@@ -1,3 +1,6 @@
+# تفعيل دعم الصوت في Replit
+audio = true
+
 run = "npm run dev"
 modules = ["nodejs-20", "web"]
 hidden = [".config", "package-lock.json"]

@@ -58,14 +58,28 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
 
   const startRecording = async () => {
     try {
-      // طلب أذونات الميكروفون
+      // التحقق من دعم المتصفح للميكروفون
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('متصفحك لا يدعم تسجيل الصوت');
+      }
+
+      console.log('🎤 طلب أذونات الميكروفون...');
+      
+      // طلب أذونات الميكروفون مع معالجة شاملة للأخطاء
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: { 
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true
+          autoGainControl: true,
+          sampleRate: 44100,
+          channelCount: 1
         } 
       });
+      
+      // التحقق من صحة الـ stream
+      if (!stream || !stream.getAudioTracks || stream.getAudioTracks().length === 0) {
+        throw new Error('فشل في الحصول على مسار الصوت من الميكروفون');
+      }
       
       streamRef.current = stream;
       console.log('✅ تم الحصول على إذن الميكروفون للتسجيل المتقطع');
@@ -113,7 +127,22 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
       
     } catch (error) {
       console.error('❌ خطأ في بدء التسجيل:', error);
-      alert('حدث خطأ في بدء التسجيل. يرجى التأكد من السماح بالوصول للميكروفون.');
+      
+      let errorMessage = 'حدث خطأ في بدء التسجيل. ';
+      
+      if (error.name === 'NotAllowedError') {
+        errorMessage += 'يرجى السماح بالوصول للميكروفون من إعدادات المتصفح.';
+      } else if (error.name === 'NotFoundError') {
+        errorMessage += 'لم يتم العثور على ميكروفون. تأكد من توصيل ميكروفون وإعادة المحاولة.';
+      } else if (error.name === 'NotSupportedError') {
+        errorMessage += 'متصفحك لا يدعم تسجيل الصوت.';
+      } else if (error.name === 'NotReadableError') {
+        errorMessage += 'الميكروفون مستخدم من تطبيق آخر. أغلق التطبيقات الأخرى وحاول مرة أخرى.';
+      } else {
+        errorMessage += error.message || 'خطأ غير معروف.';
+      }
+      
+      alert(errorMessage);
     }
   };
 
@@ -363,6 +392,49 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  // التحقق من أذونات الميكروفون
+  const checkMicrophonePermissions = async () => {
+    try {
+      console.log('🔍 فحص أذونات الميكروفون...');
+      
+      // التحقق من الأذونات المخزنة
+      if (navigator.permissions) {
+        const permission = await navigator.permissions.query({ name: 'microphone' });
+        console.log('📋 حالة إذن الميكروفون:', permission.state);
+        
+        if (permission.state === 'denied') {
+          alert('❌ تم رفض إذن الميكروفون. يرجى تفعيله من إعدادات المتصفح.');
+          return false;
+        }
+      }
+      
+      // اختبار الوصول للميكروفون
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log('✅ الميكروفون متاح ويعمل بشكل صحيح');
+      
+      // إيقاف الاختبار فوراً
+      stream.getTracks().forEach(track => track.stop());
+      
+      alert('✅ الميكروفون يعمل بشكل صحيح! يمكنك الآن بدء التسجيل.');
+      return true;
+      
+    } catch (error) {
+      console.error('❌ فشل اختبار الميكروفون:', error);
+      
+      let errorMsg = 'فشل في اختبار الميكروفون:\n';
+      if (error.name === 'NotAllowedError') {
+        errorMsg += '• يرجى السماح بالوصول للميكروفون';
+      } else if (error.name === 'NotFoundError') {
+        errorMsg += '• لم يتم العثور على ميكروفون متصل';
+      } else {
+        errorMsg += `• ${error.message}`;
+      }
+      
+      alert(errorMsg);
+      return false;
+    }
+  };
+
   return (
     <Box bg={cardBg} p={6} borderRadius="lg" shadow="md" w="full">
       <VStack spacing={4}>
@@ -425,6 +497,17 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
           >
             {isRecording ? "⏹️ إيقاف التسجيل" : "🎙️ بدء التسجيل"}
           </Button>
+          
+          {!isRecording && (
+            <Button
+              colorScheme="gray"
+              size="lg"
+              variant="outline"
+              onClick={checkMicrophonePermissions}
+            >
+              🔍 اختبار الميكروفون
+            </Button>
+          )}
         </HStack>
 
         {/* Info Text */}
