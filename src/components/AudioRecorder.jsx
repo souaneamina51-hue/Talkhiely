@@ -438,54 +438,10 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
   return (
     <Box bg={cardBg} p={6} borderRadius="lg" shadow="md" w="full">
       <VStack spacing={4}>
-        <HStack justify="space-between" w="full">
-          <Text fontSize="xl" fontWeight="bold" color="blue.600">
-            🎙️ تسجيل الصوت
-          </Text>
-          <Badge colorScheme={isRecording ? "red" : "gray"} variant="solid">
-            {isRecording ? "🔴 مسجل" : "⏸️ متوقف"}
-          </Badge>
-        </HStack>
-
         {/* Timer Display */}
         <Text fontSize="2xl" fontWeight="bold" color={isRecording ? "red.500" : "gray.500"}>
           {formatTime(timer)}
         </Text>
-
-        {/* Recording Stats */}
-        <HStack spacing={6}>
-          <VStack>
-            <Text fontSize="sm" color="gray.600">المقاطع المسجلة</Text>
-            <Badge colorScheme="blue" variant="solid" fontSize="md" px={3} py={1}>
-              {recordedChunks}
-            </Badge>
-          </VStack>
-          <VStack>
-            <Text fontSize="sm" color="gray.600">قيد المعالجة</Text>
-            <Badge 
-              colorScheme={processingChunks > 0 ? "orange" : "green"} 
-              variant="solid" 
-              fontSize="md" 
-              px={3} 
-              py={1}
-            >
-              {processingChunks}
-            </Badge>
-          </VStack>
-        </HStack>
-
-        {/* Processing Progress */}
-        {processingChunks > 0 && (
-          <Alert status="info" borderRadius="lg" w="full">
-            <AlertIcon />
-            <VStack align="start" spacing={2} flex={1}>
-              <Text fontWeight="bold">
-                🤖 جاري معالجة {processingChunks} مقطع...
-              </Text>
-              <Progress size="sm" isIndeterminate colorScheme="blue" w="full" />
-            </VStack>
-          </Alert>
-        )}
 
         {/* Control Buttons */}
         <HStack spacing={4}>
