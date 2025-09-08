@@ -497,17 +497,6 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
           >
             {isRecording ? "⏹️ إيقاف التسجيل" : "🎙️ بدء التسجيل"}
           </Button>
-          
-          {!isRecording && (
-            <Button
-              colorScheme="gray"
-              size="lg"
-              variant="outline"
-              onClick={checkMicrophonePermissions}
-            >
-              🔍 اختبار الميكروفون
-            </Button>
-          )}
         </HStack>
 
         {/* Info Text */}
