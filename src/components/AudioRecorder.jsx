@@ -455,11 +455,7 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
           </Button>
         </HStack>
 
-        {/* Info Text */}
-        <Text fontSize="sm" color="gray.600" textAlign="center">
-          سيتم تقسيم التسجيل تلقائياً كل {CHUNK_DURATION / 1000} ثوان ومعالجة كل مقطع منفرداً
-        </Text>
-      </VStack>
+        </VStack>
     </Box>
   );
 };
