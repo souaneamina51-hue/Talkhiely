@@ -53,7 +53,7 @@ const SummaryInterface = ({ trialStatus }) => {
           {/* Header */}
           <Box textAlign="center" py={4}>
             <Heading size="2xl" color="blue.600" mb={4}>
-              🎙️ نظام التسجيل والتلخيص الذكي
+              🎙️ ابدأ التلخيص الآن
             </Heading>
             <Text fontSize="lg" color="gray.600">
               سجل محاضراتك واحصل على تلخيص فوري للنقاط المهمة كل بضع ثواني
