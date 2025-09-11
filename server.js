@@ -6,6 +6,10 @@ import { dirname } from 'path';
 import multer from 'multer';
 import cors from 'cors';
 import OpenAI from 'openai';
+import dotenv from 'dotenv';
+
+// تحميل متغيرات البيئة
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -13,12 +17,21 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.BACKEND_PORT || 3001;
 
-// إعداد OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
-
-console.log('🔑 OpenAI API Key:', process.env.OPENAI_API_KEY ? 'موجود' : 'غير موجود');
+// إعداد OpenAI مع معالجة الأخطاء
+let openai = null;
+try {
+  if (process.env.OPENAI_API_KEY) {
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY
+    });
+    console.log('🔑 OpenAI API Key: موجود وجاهز للاستخدام');
+  } else {
+    console.warn('⚠️ مفتاح OpenAI غير موجود - سيتم استخدام النص الاحتياطي');
+  }
+} catch (error) {
+  console.error('❌ خطأ في إعداد OpenAI:', error.message);
+  openai = null;
+}
 
 // إعداد CORS
 app.use(cors());
@@ -43,6 +56,15 @@ app.post('/api/check-trial', (req, res) => {
   res.json({ status: 'active', remaining_days: 7 });
 });
 
+// مسار API لفحص حالة النظام
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'running',
+    openai_available: !!openai && !!process.env.OPENAI_API_KEY,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // مسار API للتفريغ النصي للمقاطع الصوتية باستخدام OpenAI Whisper
 app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
   try {
@@ -57,9 +79,9 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
 
     console.log(`🔤 تفريغ نصي OpenAI Whisper لمقطع بحجم ${Math.round(audioBuffer.length / 1024)} KB`);
 
-    // التحقق من وجود مفتاح OpenAI
-    if (!process.env.OPENAI_API_KEY) {
-      console.warn('⚠️ مفتاح OpenAI غير موجود، استخدام النص الاحتياطي');
+    // التحقق من وجود مفتاح OpenAI ووجود الكائن
+    if (!openai || !process.env.OPENAI_API_KEY) {
+      console.warn('⚠️ OpenAI غير متاح، استخدام النص الاحتياطي');
       return getFallbackTranscription(res, language);
     }
 
@@ -144,9 +166,9 @@ app.post('/api/summarize', async (req, res) => {
 
     console.log(`📝 تلخيص OpenAI GPT لنص بطول ${text.length} حرف - مقطع ${chunkNumber}`);
 
-    // التحقق من وجود مفتاح OpenAI
-    if (!process.env.OPENAI_API_KEY) {
-      console.warn('⚠️ مفتاح OpenAI غير موجود، استخدام التلخيص الاحتياطي');
+    // التحقق من وجود مفتاح OpenAI ووجود الكائن
+    if (!openai || !process.env.OPENAI_API_KEY) {
+      console.warn('⚠️ OpenAI غير متاح، استخدام التلخيص الاحتياطي');
       return getFallbackSummary(res, text, language, chunkNumber);
     }
 

@@ -17,7 +17,7 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
   const [timer, setTimer] = useState(0);
   const [processingChunks, setProcessingChunks] = useState(0);
   const [recordedChunks, setRecordedChunks] = useState(0);
-  
+
   // refs للتحكم في التسجيل والتقسيم
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
@@ -30,7 +30,7 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
 
   // إعدادات التقسيم
   const CHUNK_DURATION = 7000; // 7 ثواني لكل مقطع
-  
+
   const cardBg = useColorModeValue('white', 'gray.800');
 
   // تنظيف الموارد عند إلغاء تحميل المكون
@@ -64,7 +64,7 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
       }
 
       console.log('🎤 طلب أذونات الميكروفون...');
-      
+
       // طلب أذونات الميكروفون مع معالجة شاملة للأخطاء
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: { 
@@ -75,12 +75,12 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
           channelCount: 1
         } 
       });
-      
+
       // التحقق من صحة الـ stream
       if (!stream || !stream.getAudioTracks || stream.getAudioTracks().length === 0) {
         throw new Error('فشل في الحصول على مسار الصوت من الميكروفون');
       }
-      
+
       streamRef.current = stream;
       console.log('✅ تم الحصول على إذن الميكروفون للتسجيل المتقطع');
 
@@ -91,7 +91,7 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: 'audio/webm;codecs=opus'
       });
-      
+
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
       chunkCounterRef.current = 0;
@@ -116,7 +116,7 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
       setTimer(0);
       setRecordedChunks(0);
       setProcessingChunks(0);
-      
+
       // إخبار المكون الأب بتغيير حالة التسجيل
       if (onRecordingStateChange) {
         onRecordingStateChange(true);
@@ -124,12 +124,12 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
 
       // تشغيل مؤقت التقسيم
       startChunkTimer();
-      
+
     } catch (error) {
       console.error('❌ خطأ في بدء التسجيل:', error);
-      
+
       let errorMessage = 'حدث خطأ في بدء التسجيل. ';
-      
+
       if (error.name === 'NotAllowedError') {
         errorMessage += 'يرجى السماح بالوصول للميكروفون من إعدادات المتصفح.';
       } else if (error.name === 'NotFoundError') {
@@ -141,7 +141,7 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
       } else {
         errorMessage += error.message || 'خطأ غير معروف.';
       }
-      
+
       alert(errorMessage);
     }
   };
@@ -151,14 +151,14 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         // إيقاف التسجيل الحالي لمعالجة المقطع
         mediaRecorderRef.current.stop();
-        
+
         // بدء تسجيل مقطع جديد بعد قليل
         setTimeout(() => {
           if (isRecording) {
             const mediaRecorder = new MediaRecorder(streamRef.current, {
               mimeType: 'audio/webm;codecs=opus'
             });
-            
+
             mediaRecorderRef.current = mediaRecorder;
             audioChunksRef.current = [];
 
@@ -185,21 +185,21 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
     try {
       chunkCounterRef.current += 1;
       const chunkNumber = chunkCounterRef.current;
-      
+
       setRecordedChunks(chunkNumber);
       setProcessingChunks(prev => prev + 1);
 
       // إنشاء blob من المقطع الحالي
       const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-      
+
       console.log(`🎵 معالجة المقطع رقم ${chunkNumber} - الحجم: ${Math.round(audioBlob.size / 1024)} KB`);
 
       // إرسال المقطع للمعالجة
       const transcribedText = await transcribeAudioChunk(audioBlob, chunkNumber);
-      
+
       if (transcribedText && transcribedText.trim()) {
         const summary = await summarizeText(transcribedText, chunkNumber);
-        
+
         // إرسال النتيجة إلى المكون الأب
         if (onNewSummary && summary) {
           onNewSummary({
@@ -214,7 +214,7 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
       }
 
       setProcessingChunks(prev => prev - 1);
-      
+
     } catch (error) {
       console.error(`❌ خطأ في معالجة المقطع:`, error);
       setProcessingChunks(prev => prev - 1);
@@ -224,43 +224,40 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
   const transcribeAudioChunk = async (audioBlob, chunkNumber) => {
     try {
       console.log(`🔤 بدء تفريغ المقطع رقم ${chunkNumber} باستخدام OpenAI Whisper...`);
-      
+
       // إرسال الصوت إلى الخادم للتفريغ
       const formData = new FormData();
       formData.append('audio', audioBlob);
       formData.append('language', 'ar-DZ');
-      
+
       const response = await fetch('/api/transcribe', {
         method: 'POST',
         body: formData
       });
-      
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
-      
+
       const result = await response.json();
-      
-      if (result.source === 'openai-whisper') {
-        console.log(`✅ تم تفريغ المقطع ${chunkNumber} بنجاح من OpenAI Whisper`);
-      } else {
-        console.log(`✅ تم تفريغ المقطع ${chunkNumber} بنجاح من الخادم (احتياطي)`);
+
+      if (result.error) {
+        throw new Error(result.error);
       }
-      
-      return result.text || '';
-      
+
+      if (result.source === 'openai-whisper') {
+        console.log(`✅ تم تفريغ المقطع ${chunkNumber} بواسطة OpenAI بنجاح`);
+      } else {
+        console.log(`⚠️ تم تفريغ المقطع ${chunkNumber} بواسطة النظام الاحتياطي`);
+      }
+
+      return result.text;
+
     } catch (error) {
       console.error(`❌ خطأ في تفريغ المقطع ${chunkNumber}:`, error);
-      
-      // نص احتياطي محلي في حالة فشل الاتصال بالخادم
-      const algerianHistoryTexts = [
-        "في هذا المقطع نتحدث عن تاريخ الجزائر العريق ودور الثورة الجزائرية في تحرير البلاد من الاستعمار الفرنسي وبناء دولة حديثة.",
-        "المحاضرة تركز على الحضارات التي مرت بالجزائر عبر التاريخ من الأمازيغ والرومان والعرب والعثمانيين وتأثيرها على الثقافة الجزائرية.",
-        "نناقش في هذا الجزء دور المقاومة الشعبية الجزائرية ضد الاستعمار وأبرز الشخصيات التاريخية مثل الأمير عبد القادر ومصالي الحاج."
-      ];
-      
-      const contextualText = algerianHistoryTexts[(chunkNumber - 1) % algerianHistoryTexts.length] || algerianHistoryTexts[0];
-      return `${contextualText} - تم التفريغ الاحتياطي المحلي في ${new Date().toLocaleTimeString('ar-DZ')}`;
+      // إرجاع نص احتياطي بدلاً من رمي الخطأ
+      return `خطأ في تفريغ المقطع ${chunkNumber}: ${error.message}`;
     }
   };
 
@@ -268,43 +265,42 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
   const summarizeText = async (text, chunkNumber) => {
     try {
       console.log(`📝 بدء تلخيص المقطع رقم ${chunkNumber}...`);
-      
+
       const response = await fetch('/api/summarize', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          text,
+          text: text,
           language: 'ar-DZ',
-          chunkNumber
+          chunkNumber: chunkNumber
         })
       });
-      
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
-      
+
       const result = await response.json();
-      console.log(`✅ تم تلخيص المقطع ${chunkNumber} بنجاح من الخادم`);
-      return result.summary || '';
-      
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      if (result.source === 'openai-gpt') {
+        console.log(`✅ تم تلخيص المقطع ${chunkNumber} بواسطة OpenAI بنجاح`);
+      } else {
+        console.log(`⚠️ تم تلخيص المقطع ${chunkNumber} بواسطة النظام الاحتياطي`);
+      }
+
+      return result.summary;
+
     } catch (error) {
       console.error(`❌ خطأ في تلخيص المقطع ${chunkNumber}:`, error);
-      
-      // تلخيصات احتياطية ذكية حسب رقم المقطع
-      const summaryTemplates = [
-        `🎯 النقطة الأولى: تم التركيز على المبادئ الأساسية والمفاهيم الجوهرية التي تشكل أساس الموضوع المطروح.`,
-        `💡 النقطة الثانية: تم شرح الطرق العملية والاستراتيجيات المختلفة لتطبيق هذه المفاهيم في الواقع.`,
-        `🔍 النقطة الثالثة: تم تحليل التحديات والصعوبات المحتملة وكيفية التعامل معها بكفاءة.`,
-        `⭐ النقطة الرابعة: تم عرض أمثلة واقعية ونماذج ناجحة تدعم الأفكار المطروحة.`,
-        `🚀 النقطة الخامسة: تم التطرق إلى الفرص المستقبلية وإمكانيات التطوير والتحسين.`,
-        `🎖️ النقطة السادسة: تم تلخيص الفوائد والمكاسب المتوقعة من تطبيق هذه الحلول.`,
-        `📊 النقطة السابعة: تم عرض الخطوات العملية والتوصيات النهائية للتنفيذ الناجح.`
-      ];
-      
-      const template = summaryTemplates[(chunkNumber - 1) % summaryTemplates.length] || summaryTemplates[0];
-      return template;
+      // إرجاع تلخيص احتياطي بدلاً من رمي الخطأ
+      return `📝 ملخص المقطع ${chunkNumber}: حدث خطأ في التلخيص - ${error.message}`;
     }
   };
 
@@ -312,13 +308,13 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
   const startSpeechRecognition = () => {
     try {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      
+
       if (SpeechRecognition) {
         const recognition = new SpeechRecognition();
         recognition.lang = 'ar-SA';
         recognition.continuous = true;
         recognition.interimResults = true;
-        
+
         recognition.onresult = (event) => {
           let finalTranscript = '';
           for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -326,7 +322,7 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
               finalTranscript += event.results[i][0].transcript;
             }
           }
-          
+
           if (finalTranscript.trim()) {
             currentTranscriptionRef.current += ' ' + finalTranscript;
             console.log('🎯 نص مُفرّغ جديد:', finalTranscript);
@@ -350,12 +346,12 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
 
   const stopRecording = () => {
     setIsRecording(false);
-    
+
     // إخبار المكون الأب بتغيير حالة التسجيل
     if (onRecordingStateChange) {
       onRecordingStateChange(false);
     }
-    
+
     // إيقاف التعرف على الكلام
     if (speechRecognitionRef.current) {
       try {
@@ -365,24 +361,24 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
         console.log('التعرف على الكلام توقف بالفعل');
       }
     }
-    
+
     // إيقاف مؤقت التقسيم
     if (chunkTimerRef.current) {
       clearInterval(chunkTimerRef.current);
       chunkTimerRef.current = null;
     }
-    
+
     // إيقاف التسجيل الحالي
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
-    
+
     // إيقاف stream
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
-    
+
     console.log('⏹️ تم إيقاف التسجيل المتقطع والتعرف على الكلام');
   };
 
@@ -396,31 +392,31 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
   const checkMicrophonePermissions = async () => {
     try {
       console.log('🔍 فحص أذونات الميكروفون...');
-      
+
       // التحقق من الأذونات المخزنة
       if (navigator.permissions) {
         const permission = await navigator.permissions.query({ name: 'microphone' });
         console.log('📋 حالة إذن الميكروفون:', permission.state);
-        
+
         if (permission.state === 'denied') {
           alert('❌ تم رفض إذن الميكروفون. يرجى تفعيله من إعدادات المتصفح.');
           return false;
         }
       }
-      
+
       // اختبار الوصول للميكروفون
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       console.log('✅ الميكروفون متاح ويعمل بشكل صحيح');
-      
+
       // إيقاف الاختبار فوراً
       stream.getTracks().forEach(track => track.stop());
-      
+
       alert('✅ الميكروفون يعمل بشكل صحيح! يمكنك الآن بدء التسجيل.');
       return true;
-      
+
     } catch (error) {
       console.error('❌ فشل اختبار الميكروفون:', error);
-      
+
       let errorMsg = 'فشل في اختبار الميكروفون:\n';
       if (error.name === 'NotAllowedError') {
         errorMsg += '• يرجى السماح بالوصول للميكروفون';
@@ -429,7 +425,7 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
       } else {
         errorMsg += `• ${error.message}`;
       }
-      
+
       alert(errorMsg);
       return false;
     }
