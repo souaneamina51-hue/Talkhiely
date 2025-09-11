@@ -17,19 +17,27 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.BACKEND_PORT || 3001;
 
+// 🔹 نقطة تحقق 1: طباعة متغيرات البيئة
+console.log('🔍 [نقطة تحقق 1] فحص متغيرات البيئة:');
+console.log('   - OPENAI_API_KEY موجود:', !!process.env.OPENAI_API_KEY);
+console.log('   - OPENAI_API_KEY يبدأ بـ sk-:', process.env.OPENAI_API_KEY?.startsWith('sk-'));
+console.log('   - طول المفتاح:', process.env.OPENAI_API_KEY?.length || 0);
+console.log('   - PORT:', PORT);
+
 // إعداد OpenAI مع معالجة الأخطاء
 let openai = null;
 try {
-  if (process.env.OPENAI_API_KEY) {
+  if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.startsWith('sk-')) {
     openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY
     });
-    console.log('🔑 OpenAI API Key: موجود وجاهز للاستخدام');
+    console.log('✅ [نقطة تحقق 1] OpenAI API Key: موجود وجاهز للاستخدام');
   } else {
-    console.warn('⚠️ مفتاح OpenAI غير موجود - سيتم استخدام النص الاحتياطي');
+    console.warn('⚠️ [نقطة تحقق 1] مفتاح OpenAI غير موجود أو غير صحيح - سيتم استخدام النص الاحتياطي');
+    console.log('   المفتاح الحالي:', process.env.OPENAI_API_KEY ? 'موجود لكن غير صحيح' : 'غير موجود');
   }
 } catch (error) {
-  console.error('❌ خطأ في إعداد OpenAI:', error.message);
+  console.error('❌ [نقطة تحقق 1] خطأ في إعداد OpenAI:', error.message);
   openai = null;
 }
 
@@ -48,12 +56,45 @@ const upload = multer({
   }
 });
 
-// مسار API للتحقق من الفترة التجريبية
+// 🔹 نقطة تحقق 2: API للتحقق من الفترة التجريبية
 app.post('/api/check-trial', (req, res) => {
-  const { deviceId } = req.body;
-
-  // هنا يمكن استبدال البيانات الثابتة بمنطق حقيقي مع قاعدة بيانات
-  res.json({ status: 'active', remaining_days: 7 });
+  try {
+    console.log('📋 [نقطة تحقق 2] طلب فحص الفترة التجريبية:');
+    console.log('   - Body:', req.body);
+    console.log('   - Headers:', req.headers);
+    
+    const { deviceId } = req.body;
+    
+    // التحقق من البيانات المرسلة
+    if (!deviceId) {
+      console.warn('⚠️ [نقطة تحقق 2] deviceId مفقود');
+      return res.status(400).json({ 
+        valid: false, 
+        error: 'deviceId مطلوب',
+        status: 'error' 
+      });
+    }
+    
+    // محاكاة منطق الفترة التجريبية
+    const trialData = {
+      status: 'active',
+      remaining_days: 7,
+      valid: true,
+      deviceId: deviceId,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log('✅ [نقطة تحقق 2] إرجاع بيانات الفترة التجريبية:', trialData);
+    res.json(trialData);
+    
+  } catch (error) {
+    console.error('❌ [نقطة تحقق 2] خطأ في فحص الفترة التجريبية:', error);
+    res.status(500).json({ 
+      valid: false, 
+      error: 'خطأ في الخادم: ' + error.message,
+      status: 'error' 
+    });
+  }
 });
 
 // مسار API لفحص حالة النظام
@@ -65,31 +106,72 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// مسار API للتفريغ النصي للمقاطع الصوتية باستخدام OpenAI Whisper
+// 🔹 نقطة تحقق 3: API للتفريغ النصي للمقاطع الصوتية باستخدام OpenAI Whisper
 app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
   try {
+    console.log('🔤 [نقطة تحقق 3] بدء معالجة طلب التفريغ:');
+    console.log('   - req.file موجود:', !!req.file);
+    console.log('   - req.body:', req.body);
+    
     const { language } = req.body;
     const audioBuffer = req.file?.buffer;
     
-    if (!audioBuffer) {
+    // 🔹 نقطة تحقق 3أ: فحص الملف المرفوع
+    if (!req.file) {
+      console.error('❌ [نقطة تحقق 3أ] req.file غير موجود');
       return res.status(400).json({ 
-        error: 'لم يتم العثور على ملف صوتي' 
+        error: 'لم يتم رفع أي ملف',
+        received_fields: Object.keys(req.body),
+        file_info: null
+      });
+    }
+    
+    if (!audioBuffer) {
+      console.error('❌ [نقطة تحقق 3أ] audioBuffer غير موجود رغم وجود req.file');
+      return res.status(400).json({ 
+        error: 'الملف المرفوع لا يحتوي على بيانات',
+        file_info: {
+          fieldname: req.file.fieldname,
+          originalname: req.file.originalname,
+          mimetype: req.file.mimetype,
+          size: req.file.size
+        }
       });
     }
 
-    console.log(`🔤 تفريغ نصي OpenAI Whisper لمقطع بحجم ${Math.round(audioBuffer.length / 1024)} KB`);
+    console.log(`✅ [نقطة تحقق 3أ] ملف صوتي صالح:`);
+    console.log(`   - الاسم: ${req.file.originalname}`);
+    console.log(`   - النوع: ${req.file.mimetype}`);
+    console.log(`   - الحجم: ${Math.round(audioBuffer.length / 1024)} KB`);
+    console.log(`   - اللغة المطلوبة: ${language || 'ar (افتراضي)'}`);
 
-    // التحقق من وجود مفتاح OpenAI ووجود الكائن
+    // 🔹 نقطة تحقق 3ب: فحص صيغة الملف
+    const supportedTypes = ['audio/webm', 'audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/m4a', 'audio/x-m4a'];
+    if (!supportedTypes.includes(req.file.mimetype)) {
+      console.warn(`⚠️ [نقطة تحقق 3ب] نوع ملف غير مدعوم: ${req.file.mimetype}`);
+      console.log(`   الأنواع المدعومة: ${supportedTypes.join(', ')}`);
+    }
+
+    // 🔹 نقطة تحقق 4: فحص OpenAI API
+    console.log('🔍 [نقطة تحقق 4] فحص OpenAI API:');
+    console.log('   - openai object موجود:', !!openai);
+    console.log('   - OPENAI_API_KEY موجود:', !!process.env.OPENAI_API_KEY);
+    
     if (!openai || !process.env.OPENAI_API_KEY) {
-      console.warn('⚠️ OpenAI غير متاح، استخدام النص الاحتياطي');
+      console.warn('⚠️ [نقطة تحقق 4] OpenAI غير متاح، استخدام النص الاحتياطي');
       return getFallbackTranscription(res, language);
     }
 
     try {
       // إنشاء ملف من البيانات
-      const file = new File([audioBuffer], 'audio.webm', { type: 'audio/webm' });
+      const file = new File([audioBuffer], req.file.originalname || 'audio.webm', { 
+        type: req.file.mimetype || 'audio/webm' 
+      });
       
-      console.log('🤖 إرسال الصوت إلى OpenAI Whisper...');
+      console.log('🤖 [نقطة تحقق 4] إرسال الصوت إلى OpenAI Whisper...');
+      console.log('   - اسم الملف:', file.name);
+      console.log('   - نوع الملف:', file.type);
+      console.log('   - حجم الملف:', Math.round(file.size / 1024), 'KB');
       
       // تفريغ الصوت باستخدام OpenAI Whisper
       const transcription = await openai.audio.transcriptions.create({
@@ -100,27 +182,50 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
         temperature: 0.1
       });
 
+      console.log('📥 [نقطة تحقق 4] استجابة OpenAI Whisper كاملة:', transcription);
+
       const transcribedText = transcription.text;
-      console.log(`✅ تم التفريغ بنجاح من OpenAI: "${transcribedText.substring(0, 100)}..."`);
+      console.log(`✅ [نقطة تحقق 4] تم التفريغ بنجاح من OpenAI:`);
+      console.log(`   النص الكامل: "${transcribedText}"`);
+      console.log(`   طول النص: ${transcribedText.length} حرف`);
 
       if (!transcribedText || transcribedText.trim().length < 5) {
-        console.warn('⚠️ النص المُفرّغ من OpenAI قصير جداً، استخدام النص الاحتياطي');
+        console.warn('⚠️ [نقطة تحقق 4] النص المُفرّغ من OpenAI قصير جداً، استخدام النص الاحتياطي');
         return getFallbackTranscription(res, language);
       }
 
       const timestampedText = `${transcribedText} - تم التفريغ بواسطة OpenAI في ${new Date().toLocaleTimeString('ar-DZ')}`;
 
-      res.json({
+      const result = {
         text: timestampedText,
         language: language || 'ar',
         duration: Math.round(audioBuffer.length / 16000),
-        confidence: 0.95, // Whisper عادة يعطي دقة عالية
-        source: 'openai-whisper'
-      });
+        confidence: 0.95,
+        source: 'openai-whisper',
+        original_length: transcribedText.length,
+        file_info: {
+          name: req.file.originalname,
+          size: req.file.size,
+          type: req.file.mimetype
+        }
+      };
+
+      console.log('📤 [نقطة تحقق 4] إرجاع النتيجة:', result);
+      res.json(result);
 
     } catch (openaiError) {
-      console.error('❌ خطأ في OpenAI Whisper:', openaiError.message);
-      return getFallbackTranscription(res, language);
+      console.error('❌ [نقطة تحقق 4] خطأ مفصل في OpenAI Whisper:');
+      console.error('   - النوع:', openaiError.constructor.name);
+      console.error('   - الرسالة:', openaiError.message);
+      console.error('   - الكود:', openaiError.code);
+      console.error('   - التفاصيل:', openaiError);
+      
+      return res.status(500).json({
+        error: 'خطأ في OpenAI Whisper: ' + openaiError.message,
+        error_type: openaiError.constructor.name,
+        error_code: openaiError.code,
+        fallback_used: false
+      });
     }
 
   } catch (error) {
@@ -153,27 +258,49 @@ function getFallbackTranscription(res, language) {
   });
 }
 
-// مسار API للتلخيص النصي باستخدام OpenAI GPT
+// 🔹 نقطة تحقق 5: API للتلخيص النصي باستخدام OpenAI GPT
 app.post('/api/summarize', async (req, res) => {
   try {
+    console.log('📝 [نقطة تحقق 5] بدء معالجة طلب التلخيص:');
+    console.log('   - req.body:', req.body);
+    
     const { text, language, chunkNumber } = req.body;
     
+    // 🔹 نقطة تحقق 5أ: فحص النص المرسل
+    console.log('🔍 [نقطة تحقق 5أ] فحص النص المرسل:');
+    console.log('   - text موجود:', !!text);
+    console.log('   - text طول:', text?.length || 0);
+    console.log('   - text preview:', text?.substring(0, 100) + (text?.length > 100 ? '...' : ''));
+    console.log('   - language:', language);
+    console.log('   - chunkNumber:', chunkNumber);
+    
     if (!text || text.trim().length === 0) {
+      console.error('❌ [نقطة تحقق 5أ] نص التلخيص مفقود أو فارغ');
       return res.status(400).json({ 
-        error: 'لم يتم تقديم نص للتلخيص' 
+        error: 'لم يتم تقديم نص للتلخيص',
+        received_data: {
+          text_exists: !!text,
+          text_length: text?.length || 0,
+          language: language,
+          chunkNumber: chunkNumber
+        }
       });
     }
 
-    console.log(`📝 تلخيص OpenAI GPT لنص بطول ${text.length} حرف - مقطع ${chunkNumber}`);
-
-    // التحقق من وجود مفتاح OpenAI ووجود الكائن
+    // 🔹 نقطة تحقق 5ب: فحص OpenAI API للتلخيص
+    console.log('🔍 [نقطة تحقق 5ب] فحص OpenAI API للتلخيص:');
+    console.log('   - openai object موجود:', !!openai);
+    console.log('   - OPENAI_API_KEY موجود:', !!process.env.OPENAI_API_KEY);
+    
     if (!openai || !process.env.OPENAI_API_KEY) {
-      console.warn('⚠️ OpenAI غير متاح، استخدام التلخيص الاحتياطي');
+      console.warn('⚠️ [نقطة تحقق 5ب] OpenAI غير متاح، استخدام التلخيص الاحتياطي');
       return getFallbackSummary(res, text, language, chunkNumber);
     }
 
     try {
-      console.log('🤖 إرسال النص إلى OpenAI GPT للتلخيص...');
+      console.log('🤖 [نقطة تحقق 5ب] إرسال النص إلى OpenAI GPT للتلخيص...');
+      console.log('   - النموذج: gpt-3.5-turbo');
+      console.log('   - طول النص المرسل:', text.length);
       
       const completion = await openai.chat.completions.create({
         model: 'gpt-3.5-turbo',
@@ -197,28 +324,50 @@ app.post('/api/summarize', async (req, res) => {
         presence_penalty: 0.1
       });
 
+      console.log('📥 [نقطة تحقق 5ب] استجابة OpenAI GPT كاملة:', completion);
+
       const summary = completion.choices[0]?.message?.content?.trim();
       
+      console.log('📝 [نقطة تحقق 5ب] التلخيص المستخرج:');
+      console.log('   - التلخيص الخام:', summary);
+      console.log('   - طول التلخيص:', summary?.length || 0);
+      
       if (!summary || summary.length < 10) {
-        console.warn('⚠️ التلخيص من OpenAI قصير جداً، استخدام التلخيص الاحتياطي');
+        console.warn('⚠️ [نقطة تحقق 5ب] التلخيص من OpenAI قصير جداً، استخدام التلخيص الاحتياطي');
         return getFallbackSummary(res, text, language, chunkNumber);
       }
 
-      console.log(`✅ تم التلخيص بنجاح من OpenAI: "${summary}"`);
+      console.log(`✅ [نقطة تحقق 5ب] تم التلخيص بنجاح من OpenAI: "${summary}"`);
 
-      res.json({
+      const result = {
         summary: summary,
         originalLength: text.length,
         summaryLength: summary.length,
         compressionRatio: Math.round((summary.length / text.length) * 100),
         language: language || 'ar',
         chunkNumber: chunkNumber || 1,
-        source: 'openai-gpt'
-      });
+        source: 'openai-gpt',
+        input_preview: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
+        model_used: 'gpt-3.5-turbo'
+      };
+
+      console.log('📤 [نقطة تحقق 5ب] إرجاع نتيجة التلخيص:', result);
+      res.json(result);
 
     } catch (openaiError) {
-      console.error('❌ خطأ في OpenAI GPT:', openaiError.message);
-      return getFallbackSummary(res, text, language, chunkNumber);
+      console.error('❌ [نقطة تحقق 5ب] خطأ مفصل في OpenAI GPT:');
+      console.error('   - النوع:', openaiError.constructor.name);
+      console.error('   - الرسالة:', openaiError.message);
+      console.error('   - الكود:', openaiError.code);
+      console.error('   - التفاصيل:', openaiError);
+      
+      return res.status(500).json({
+        error: 'خطأ في OpenAI GPT: ' + openaiError.message,
+        error_type: openaiError.constructor.name,
+        error_code: openaiError.code,
+        input_text_length: text.length,
+        fallback_used: false
+      });
     }
 
   } catch (error) {

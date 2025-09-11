@@ -223,39 +223,60 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
 
   const transcribeAudioChunk = async (audioBlob, chunkNumber) => {
     try {
-      console.log(`🔤 بدء تفريغ المقطع رقم ${chunkNumber} باستخدام OpenAI Whisper...`);
+      console.log(`🔤 [نقطة تحقق 6أ] بدء تفريغ المقطع رقم ${chunkNumber}:`);
+      console.log(`   - حجم البيانات: ${Math.round(audioBlob.size / 1024)} KB`);
+      console.log(`   - نوع البيانات: ${audioBlob.type}`);
 
-      // إرسال الصوت إلى الخادم للتفريغ
+      // إعداد البيانات للإرسال
       const formData = new FormData();
-      formData.append('audio', audioBlob);
+      formData.append('audio', audioBlob, `chunk_${chunkNumber}.webm`);
       formData.append('language', 'ar-DZ');
+
+      console.log(`📤 [نقطة تحقق 6أ] إرسال الطلب إلى /api/transcribe...`);
 
       const response = await fetch('/api/transcribe', {
         method: 'POST',
         body: formData
       });
 
+      console.log(`📥 [نقطة تحقق 6أ] استجابة الخادم:`, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
       if (!response.ok) {
         const errorText = await response.text();
+        console.error(`❌ [نقطة تحقق 6أ] خطأ HTTP:`, {
+          status: response.status,
+          statusText: response.statusText,
+          errorText: errorText
+        });
         throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
       const result = await response.json();
+      console.log(`📋 [نقطة تحقق 6أ] نتيجة التفريغ كاملة:`, result);
 
       if (result.error) {
+        console.error(`❌ [نقطة تحقق 6أ] خطأ من الخادم:`, result.error);
         throw new Error(result.error);
       }
 
       if (result.source === 'openai-whisper') {
-        console.log(`✅ تم تفريغ المقطع ${chunkNumber} بواسطة OpenAI بنجاح`);
-      } else {
-        console.log(`⚠️ تم تفريغ المقطع ${chunkNumber} بواسطة النظام الاحتياطي`);
+        console.log(`✅ [نقطة تحقق 6أ] تم تفريغ المقطع ${chunkNumber} بواسطة OpenAI بنجاح`);
+      } else if (result.source === 'fallback') {
+        console.log(`⚠️ [نقطة تحقق 6أ] تم تفريغ المقطع ${chunkNumber} بواسطة النظام الاحتياطي`);
       }
 
       return result.text;
 
     } catch (error) {
-      console.error(`❌ خطأ في تفريغ المقطع ${chunkNumber}:`, error);
+      console.error(`❌ [نقطة تحقق 6أ] خطأ في تفريغ المقطع ${chunkNumber}:`, {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       // إرجاع نص احتياطي بدلاً من رمي الخطأ
       return `خطأ في تفريغ المقطع ${chunkNumber}: ${error.message}`;
     }
@@ -264,41 +285,64 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
 
   const summarizeText = async (text, chunkNumber) => {
     try {
-      console.log(`📝 بدء تلخيص المقطع رقم ${chunkNumber}...`);
+      console.log(`📝 [نقطة تحقق 6ب] بدء تلخيص المقطع رقم ${chunkNumber}:`);
+      console.log(`   - طول النص: ${text.length} حرف`);
+      console.log(`   - النص الكامل: "${text}"`);
+
+      const requestBody = {
+        text: text,
+        language: 'ar-DZ',
+        chunkNumber: chunkNumber
+      };
+
+      console.log(`📤 [نقطة تحقق 6ب] إرسال الطلب إلى /api/summarize:`, requestBody);
 
       const response = await fetch('/api/summarize', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          text: text,
-          language: 'ar-DZ',
-          chunkNumber: chunkNumber
-        })
+        body: JSON.stringify(requestBody)
+      });
+
+      console.log(`📥 [نقطة تحقق 6ب] استجابة الخادم:`, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
       });
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error(`❌ [نقطة تحقق 6ب] خطأ HTTP:`, {
+          status: response.status,
+          statusText: response.statusText,
+          errorText: errorText
+        });
         throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
       const result = await response.json();
+      console.log(`📋 [نقطة تحقق 6ب] نتيجة التلخيص كاملة:`, result);
 
       if (result.error) {
+        console.error(`❌ [نقطة تحقق 6ب] خطأ من الخادم:`, result.error);
         throw new Error(result.error);
       }
 
       if (result.source === 'openai-gpt') {
-        console.log(`✅ تم تلخيص المقطع ${chunkNumber} بواسطة OpenAI بنجاح`);
-      } else {
-        console.log(`⚠️ تم تلخيص المقطع ${chunkNumber} بواسطة النظام الاحتياطي`);
+        console.log(`✅ [نقطة تحقق 6ب] تم تلخيص المقطع ${chunkNumber} بواسطة OpenAI بنجاح`);
+      } else if (result.source === 'fallback') {
+        console.log(`⚠️ [نقطة تحقق 6ب] تم تلخيص المقطع ${chunkNumber} بواسطة النظام الاحتياطي`);
       }
 
       return result.summary;
 
     } catch (error) {
-      console.error(`❌ خطأ في تلخيص المقطع ${chunkNumber}:`, error);
+      console.error(`❌ [نقطة تحقق 6ب] خطأ في تلخيص المقطع ${chunkNumber}:`, {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       // إرجاع تلخيص احتياطي بدلاً من رمي الخطأ
       return `📝 ملخص المقطع ${chunkNumber}: حدث خطأ في التلخيص - ${error.message}`;
     }
