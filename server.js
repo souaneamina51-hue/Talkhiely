@@ -225,12 +225,17 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
       console.error('   - الكود:', openaiError.code);
       console.error('   - التفاصيل:', openaiError);
       
-      return res.status(500).json({
-        error: 'خطأ في OpenAI Whisper: ' + openaiError.message,
-        error_type: openaiError.constructor.name,
-        error_code: openaiError.code,
-        fallback_used: false
-      });
+      // تحديد نوع الخطأ وإرجاع رسالة مناسبة
+      if (openaiError.status === 401) {
+        console.error('🔑 تحقق من صحة المفتاح في .env');
+      } else if (openaiError.status === 429) {
+        console.error('⏰ انتظر قليلاً ثم حاول مرة أخرى');
+      } else if (openaiError.status === 500) {
+        console.error('🔧 المشكلة من جهة OpenAI، حاول لاحقاً');
+      }
+      
+      console.warn('⚠️ [نقطة تحقق 4] استخدام التفريغ الاحتياطي بسبب خطأ OpenAI');
+      return getFallbackTranscription(res, language);
     }
 
   } catch (error) {
