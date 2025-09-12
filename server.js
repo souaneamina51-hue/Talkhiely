@@ -303,9 +303,20 @@ app.post('/api/summarize', async (req, res) => {
     }
 
     try {
+      // التحقق من طول النص قبل الإرسال
+      const maxTokens = 4000; // حد آمن لـ gpt-3.5-turbo
+      const estimatedTokens = Math.ceil(text.length / 4); // تقدير تقريبي: 4 أحرف = 1 token
+      
+      if (estimatedTokens > maxTokens) {
+        console.warn(`⚠️ [نقطة تحقق 5ب] النص طويل جداً (${estimatedTokens} tokens)، سيتم اقتطاعه`);
+        text = text.substring(0, maxTokens * 3); // اقتطاع آمن
+      }
+
       console.log('🤖 [نقطة تحقق 5ب] إرسال النص إلى OpenAI GPT للتلخيص...');
       console.log('   - النموذج: gpt-3.5-turbo');
       console.log('   - طول النص المرسل:', text.length);
+      console.log('   - تقدير الـ tokens:', estimatedTokens);
+      console.log('🔑 [اختبار] API Key موجود:', !!process.env.OPENAI_API_KEY);
       
       const completion = await openai.chat.completions.create({
         model: 'gpt-3.5-turbo',
@@ -364,15 +375,29 @@ app.post('/api/summarize', async (req, res) => {
       console.error('   - النوع:', openaiError.constructor.name);
       console.error('   - الرسالة:', openaiError.message);
       console.error('   - الكود:', openaiError.code);
+      console.error('   - الحالة (status):', openaiError.status);
       console.error('   - التفاصيل:', openaiError);
       
-      return res.status(500).json({
-        error: 'خطأ في OpenAI GPT: ' + openaiError.message,
-        error_type: openaiError.constructor.name,
-        error_code: openaiError.code,
-        input_text_length: text.length,
-        fallback_used: false
-      });
+      // تحديد نوع الخطأ وإرجاع رسالة مناسبة
+      let errorMessage = 'خطأ في OpenAI GPT';
+      let shouldFallback = true;
+      
+      if (openaiError.status === 401) {
+        errorMessage = 'مفتاح OpenAI غير صحيح أو منتهي الصلاحية';
+        console.error('🔑 تحقق من صحة المفتاح في .env');
+      } else if (openaiError.status === 429) {
+        errorMessage = 'تم تجاوز حد الطلبات لـ OpenAI';
+        console.error('⏰ انتظر قليلاً ثم حاول مرة أخرى');
+      } else if (openaiError.status === 500) {
+        errorMessage = 'خطأ في خادم OpenAI';
+        console.error('🔧 المشكلة من جهة OpenAI، حاول لاحقاً');
+      } else if (openaiError.message?.includes('tokens')) {
+        errorMessage = 'النص طويل جداً لمعالجة OpenAI';
+        console.error('📏 قلل من طول النص المرسل');
+      }
+      
+      console.warn('⚠️ [نقطة تحقق 5ب] استخدام التلخيص الاحتياطي بسبب خطأ OpenAI');
+      return getFallbackSummary(res, text, language, chunkNumber);
     }
 
   } catch (error) {
