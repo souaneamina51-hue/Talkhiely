@@ -141,8 +141,24 @@ author = "agent"
 task = "workflow.run"
 args = "React Development Server"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Server"
+
 [[workflows.workflow]]
 name = "React Development Server"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev:full"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow]]
+name = "Server"
 author = "agent"
 
 [[workflows.workflow.tasks]]
