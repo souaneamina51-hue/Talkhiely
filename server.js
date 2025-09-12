@@ -163,110 +163,64 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
     console.log('   - OPENAI_API_KEY موجود:', !!process.env.OPENAI_API_KEY);
     
     if (!openai || !process.env.OPENAI_API_KEY) {
-      console.warn('⚠️ [نقطة تحقق 4] OpenAI غير متاح، استخدام النص الاحتياطي');
-      return getFallbackTranscription(res, language);
+      console.error('❌ [نقطة تحقق 4] OpenAI API Key مفقود أو غير صحيح');
+      return res.status(500).json({ 
+        error: 'Missing or invalid OpenAI API Key. Please check your environment variables.',
+        code: 'MISSING_API_KEY'
+      });
     }
 
-    try {
-      // إنشاء ملف من البيانات
-      const file = new File([audioBuffer], req.file.originalname || 'audio.webm', { 
-        type: req.file.mimetype || 'audio/webm' 
-      });
-      
-      console.log('🤖 [نقطة تحقق 4] إرسال الصوت إلى OpenAI Whisper...');
-      console.log('   - اسم الملف:', file.name);
-      console.log('   - نوع الملف:', file.type);
-      console.log('   - حجم الملف:', Math.round(file.size / 1024), 'KB');
-      
-      // تفريغ الصوت باستخدام OpenAI Whisper
-      const transcription = await openai.audio.transcriptions.create({
-        file: file,
-        model: 'whisper-1',
-        language: language === 'ar-DZ' ? 'ar' : language || 'ar',
-        response_format: 'json',
-        temperature: 0.1
-      });
+    // إنشاء ملف من البيانات
+    const file = new File([audioBuffer], req.file.originalname || 'audio.webm', { 
+      type: req.file.mimetype || 'audio/webm' 
+    });
+    
+    console.log('🤖 [نقطة تحقق 4] إرسال الصوت إلى OpenAI Whisper...');
+    console.log('   - اسم الملف:', file.name);
+    console.log('   - نوع الملف:', file.type);
+    console.log('   - حجم الملف:', Math.round(file.size / 1024), 'KB');
+    
+    // تفريغ الصوت باستخدام OpenAI Whisper
+    const transcription = await openai.audio.transcriptions.create({
+      file: file,
+      model: 'whisper-1',
+      language: language === 'ar-DZ' ? 'ar' : language || 'ar',
+      response_format: 'json',
+      temperature: 0.1
+    });
 
-      console.log('📥 [نقطة تحقق 4] استجابة OpenAI Whisper كاملة:', transcription);
+    console.log('📥 [نقطة تحقق 4] استجابة OpenAI Whisper:', transcription);
 
-      const transcribedText = transcription.text;
-      console.log(`✅ [نقطة تحقق 4] تم التفريغ بنجاح من OpenAI:`);
-      console.log(`   النص الكامل: "${transcribedText}"`);
-      console.log(`   طول النص: ${transcribedText.length} حرف`);
+    const transcribedText = transcription.text;
+    console.log(`✅ [نقطة تحقق 4] تم التفريغ بنجاح من OpenAI:`);
+    console.log(`   النص: "${transcribedText}"`);
 
-      if (!transcribedText || transcribedText.trim().length < 5) {
-        console.warn('⚠️ [نقطة تحقق 4] النص المُفرّغ من OpenAI قصير جداً، استخدام النص الاحتياطي');
-        return getFallbackTranscription(res, language);
+    const result = {
+      text: transcribedText,
+      language: transcription.language || language || 'ar',
+      duration: transcription.duration || Math.round(audioBuffer.length / 16000),
+      confidence: 0.95,
+      source: 'openai-whisper',
+      file_info: {
+        name: req.file.originalname,
+        size: req.file.size,
+        type: req.file.mimetype
       }
+    };
 
-      const timestampedText = `${transcribedText} - تم التفريغ بواسطة OpenAI في ${new Date().toLocaleTimeString('ar-DZ')}`;
-
-      const result = {
-        text: timestampedText,
-        language: language || 'ar',
-        duration: Math.round(audioBuffer.length / 16000),
-        confidence: 0.95,
-        source: 'openai-whisper',
-        original_length: transcribedText.length,
-        file_info: {
-          name: req.file.originalname,
-          size: req.file.size,
-          type: req.file.mimetype
-        }
-      };
-
-      console.log('📤 [نقطة تحقق 4] إرجاع النتيجة:', result);
-      res.json(result);
-
-    } catch (openaiError) {
-      console.error('❌ [نقطة تحقق 4] خطأ مفصل في OpenAI Whisper:');
-      console.error('   - النوع:', openaiError.constructor.name);
-      console.error('   - الرسالة:', openaiError.message);
-      console.error('   - الكود:', openaiError.code);
-      console.error('   - التفاصيل:', openaiError);
-      
-      // تحديد نوع الخطأ وإرجاع رسالة مناسبة
-      if (openaiError.status === 401) {
-        console.error('🔑 تحقق من صحة المفتاح في .env');
-      } else if (openaiError.status === 429) {
-        console.error('⏰ انتظر قليلاً ثم حاول مرة أخرى');
-      } else if (openaiError.status === 500) {
-        console.error('🔧 المشكلة من جهة OpenAI، حاول لاحقاً');
-      }
-      
-      console.warn('⚠️ [نقطة تحقق 4] استخدام التفريغ الاحتياطي بسبب خطأ OpenAI');
-      return getFallbackTranscription(res, language);
-    }
+    console.log('📤 [نقطة تحقق 4] إرجاع النتيجة:', result);
+    res.json(result);
 
   } catch (error) {
-    console.error('❌ خطأ عام في التفريغ النصي:', error);
+    console.error('❌ خطأ في التفريغ النصي:', error);
     res.status(500).json({ 
-      error: 'حدث خطأ في معالجة الملف الصوتي' 
+      error: error.message || 'حدث خطأ في معالجة الملف الصوتي',
+      code: error.code || 'TRANSCRIPTION_ERROR'
     });
   }
 });
 
-// دالة للحصول على تفريغ احتياطي
-function getFallbackTranscription(res, language) {
-  const sampleTexts = [
-    "في هذا المقطع تحدثنا عن أهمية التكنولوجيا في التعليم الحديث وكيف يمكن أن تساعد في تطوير مهارات الطلاب.",
-    "المناقشة تركز على استراتيجيات التسويق الرقمي والطرق الفعالة للوصول إلى الجمهور المستهدف عبر منصات مختلفة.",
-    "نتحدث في هذا الجزء عن التطورات الحديثة في مجال الذكاء الاصطناعي وتأثيرها على سوق العمل.",
-    "المقطع يشرح أسس إدارة المشاريع وأهمية التخطيط المسبق في ضمان نجاح أي مشروع.",
-    "النقاش يدور حول التحديات البيئية المعاصرة والحلول المبتكرة للحد من التلوث."
-  ];
 
-  const randomText = sampleTexts[Math.floor(Math.random() * sampleTexts.length)];
-  const timestampedText = `${randomText} - تم التفريغ الاحتياطي في ${new Date().toLocaleTimeString('ar-DZ')}`;
-
-  return res.json({
-    text: timestampedText,
-    language: language || 'ar',
-    duration: 30, // تقدير افتراضي
-    confidence: 0.75,
-    source: 'fallback'
-  });
-}
 
 // 🔹 نقطة تحقق 5: API للتلخيص النصي باستخدام OpenAI GPT
 app.post('/api/summarize', async (req, res) => {
@@ -280,7 +234,6 @@ app.post('/api/summarize', async (req, res) => {
     console.log('🔍 [نقطة تحقق 5أ] فحص النص المرسل:');
     console.log('   - text موجود:', !!text);
     console.log('   - text طول:', text?.length || 0);
-    console.log('   - text preview:', text?.substring(0, 100) + (text?.length > 100 ? '...' : ''));
     console.log('   - language:', language);
     console.log('   - chunkNumber:', chunkNumber);
     
@@ -288,12 +241,7 @@ app.post('/api/summarize', async (req, res) => {
       console.error('❌ [نقطة تحقق 5أ] نص التلخيص مفقود أو فارغ');
       return res.status(400).json({ 
         error: 'لم يتم تقديم نص للتلخيص',
-        received_data: {
-          text_exists: !!text,
-          text_length: text?.length || 0,
-          language: language,
-          chunkNumber: chunkNumber
-        }
+        code: 'MISSING_TEXT'
       });
     }
 
@@ -303,205 +251,72 @@ app.post('/api/summarize', async (req, res) => {
     console.log('   - OPENAI_API_KEY موجود:', !!process.env.OPENAI_API_KEY);
     
     if (!openai || !process.env.OPENAI_API_KEY) {
-      console.warn('⚠️ [نقطة تحقق 5ب] OpenAI غير متاح، استخدام التلخيص الاحتياطي');
-      return getFallbackSummary(res, text, language, chunkNumber);
-    }
-
-    try {
-      // التحقق من طول النص قبل الإرسال
-      const maxTokens = 4000; // حد آمن لـ gpt-3.5-turbo
-      const estimatedTokens = Math.ceil(text.length / 4); // تقدير تقريبي: 4 أحرف = 1 token
-      
-      if (estimatedTokens > maxTokens) {
-        console.warn(`⚠️ [نقطة تحقق 5ب] النص طويل جداً (${estimatedTokens} tokens)، سيتم اقتطاعه`);
-        text = text.substring(0, maxTokens * 3); // اقتطاع آمن
-      }
-
-      console.log('🤖 [نقطة تحقق 5ب] إرسال النص إلى OpenAI GPT للتلخيص...');
-      console.log('   - النموذج: gpt-3.5-turbo');
-      console.log('   - طول النص المرسل:', text.length);
-      console.log('   - تقدير الـ tokens:', estimatedTokens);
-      console.log('🔑 [اختبار] API Key موجود:', !!process.env.OPENAI_API_KEY);
-      
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: `أنت مساعد ذكي متخصص في تلخيص النصوص العربية والمحاضرات الأكاديمية. قم بتلخيص النص المقدم في نقطة مهمة واحدة واضحة ومفيدة. يجب أن يكون التلخيص:
-            - مختصراً في جملة أو جملتين فقط
-            - يحتوي على أهم المعلومات
-            - مكتوباً بالعربية الفصحى البسيطة
-            - يبدأ بأيقونة مناسبة للموضوع
-            - لا يتجاوز 120 حرف`
-          },
-          {
-            role: 'user',
-            content: `لخص هذا النص من المقطع رقم ${chunkNumber}:\n\n${text}`
-          }
-        ],
-        max_tokens: 150,
-        temperature: 0.3,
-        presence_penalty: 0.1
+      console.error('❌ [نقطة تحقق 5ب] OpenAI API Key مفقود أو غير صحيح');
+      return res.status(500).json({ 
+        error: 'Missing or invalid OpenAI API Key. Please check your environment variables.',
+        code: 'MISSING_API_KEY'
       });
-
-      console.log('📥 [نقطة تحقق 5ب] استجابة OpenAI GPT كاملة:', completion);
-
-      const summary = completion.choices[0]?.message?.content?.trim();
-      
-      console.log('📝 [نقطة تحقق 5ب] التلخيص المستخرج:');
-      console.log('   - التلخيص الخام:', summary);
-      console.log('   - طول التلخيص:', summary?.length || 0);
-      
-      if (!summary || summary.length < 10) {
-        console.warn('⚠️ [نقطة تحقق 5ب] التلخيص من OpenAI قصير جداً، استخدام التلخيص الاحتياطي');
-        return getFallbackSummary(res, text, language, chunkNumber);
-      }
-
-      console.log(`✅ [نقطة تحقق 5ب] تم التلخيص بنجاح من OpenAI: "${summary}"`);
-
-      const result = {
-        summary: summary,
-        originalLength: text.length,
-        summaryLength: summary.length,
-        compressionRatio: Math.round((summary.length / text.length) * 100),
-        language: language || 'ar',
-        chunkNumber: chunkNumber || 1,
-        source: 'openai-gpt',
-        input_preview: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
-        model_used: 'gpt-3.5-turbo'
-      };
-
-      console.log('📤 [نقطة تحقق 5ب] إرجاع نتيجة التلخيص:', result);
-      res.json(result);
-
-    } catch (openaiError) {
-      console.error('❌ [نقطة تحقق 5ب] خطأ مفصل في OpenAI GPT:');
-      console.error('   - النوع:', openaiError.constructor.name);
-      console.error('   - الرسالة:', openaiError.message);
-      console.error('   - الكود:', openaiError.code);
-      console.error('   - الحالة (status):', openaiError.status);
-      console.error('   - التفاصيل:', openaiError);
-      
-      // تحديد نوع الخطأ وإرجاع رسالة مناسبة
-      let errorMessage = 'خطأ في OpenAI GPT';
-      let shouldFallback = true;
-      
-      if (openaiError.status === 401) {
-        errorMessage = 'مفتاح OpenAI غير صحيح أو منتهي الصلاحية';
-        console.error('🔑 تحقق من صحة المفتاح في .env');
-      } else if (openaiError.status === 429) {
-        errorMessage = 'تم تجاوز حد الطلبات لـ OpenAI';
-        console.error('⏰ انتظر قليلاً ثم حاول مرة أخرى');
-      } else if (openaiError.status === 500) {
-        errorMessage = 'خطأ في خادم OpenAI';
-        console.error('🔧 المشكلة من جهة OpenAI، حاول لاحقاً');
-      } else if (openaiError.message?.includes('tokens')) {
-        errorMessage = 'النص طويل جداً لمعالجة OpenAI';
-        console.error('📏 قلل من طول النص المرسل');
-      }
-      
-      console.warn('⚠️ [نقطة تحقق 5ب] استخدام التلخيص الاحتياطي بسبب خطأ OpenAI');
-      return getFallbackSummary(res, text, language, chunkNumber);
     }
+
+    // التحقق من طول النص قبل الإرسال
+    let processedText = text;
+    const maxTokens = 4000;
+    const estimatedTokens = Math.ceil(text.length / 4);
+    
+    if (estimatedTokens > maxTokens) {
+      console.warn(`⚠️ [نقطة تحقق 5ب] النص طويل جداً (${estimatedTokens} tokens)، سيتم اقتطاعه`);
+      processedText = text.substring(0, maxTokens * 3);
+    }
+
+    console.log('🤖 [نقطة تحقق 5ب] إرسال النص إلى OpenAI GPT للتلخيص...');
+    
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `أنت مساعد ذكي متخصص في تلخيص النصوص العربية. قم بتلخيص النص المقدم في نقطة مهمة واضحة ومفيدة. التلخيص يجب أن يكون:
+          - مختصراً في جملة أو جملتين
+          - يحتوي على أهم المعلومات
+          - مكتوباً بالعربية الفصحى البسيطة
+          - يبدأ بأيقونة مناسبة للموضوع`
+        },
+        {
+          role: 'user',
+          content: processedText
+        }
+      ],
+      max_tokens: 150,
+      temperature: 0.3
+    });
+
+    const summary = completion.choices[0]?.message?.content?.trim();
+    
+    console.log('✅ [نقطة تحقق 5ب] تم التلخيص بنجاح من OpenAI');
+
+    const result = {
+      summary: summary,
+      originalLength: text.length,
+      summaryLength: summary.length,
+      compressionRatio: Math.round((summary.length / text.length) * 100),
+      language: language || 'ar',
+      chunkNumber: chunkNumber || 1,
+      source: 'openai-gpt'
+    };
+
+    console.log('📤 [نقطة تحقق 5ب] إرجاع نتيجة التلخيص:', result);
+    res.json(result);
 
   } catch (error) {
-    console.error('❌ خطأ عام في التلخيص:', error);
+    console.error('❌ خطأ في التلخيص:', error);
     res.status(500).json({ 
-      error: 'حدث خطأ في معالجة النص للتلخيص' 
+      error: error.message || 'حدث خطأ في معالجة النص للتلخيص',
+      code: error.code || 'SUMMARIZATION_ERROR'
     });
   }
 });
 
-// دالة للحصول على تلخيص احتياطي
-function getFallbackSummary(res, text, language, chunkNumber) {
-  const summary = generateIntelligentSummary(text, chunkNumber);
-  
-  return res.json({
-    summary: summary,
-    originalLength: text.length,
-    summaryLength: summary.length,
-    compressionRatio: Math.round((summary.length / text.length) * 100),
-    language: language || 'ar',
-    chunkNumber: chunkNumber || 1,
-    source: 'fallback'
-  });
-}
 
-// دالة لإنتاج تلخيص ذكي يعتمد على محتوى النص
-function generateIntelligentSummary(text, chunkNumber) {
-  // تنظيف النص
-  const cleanText = text.toLowerCase().replace(/[^\u0600-\u06FF\s]/g, '').trim();
-  
-  // كلمات مفتاحية للمواضيع المختلفة
-  const topicKeywords = {
-    technology: ['تكنولوجيا', 'تقنية', 'برمجة', 'حاسوب', 'ذكاء', 'اصطناعي'],
-    business: ['إدارة', 'مشروع', 'تسويق', 'أعمال', 'ريادة', 'اقتصاد'],
-    education: ['تعليم', 'تعلم', 'طلاب', 'مهارات', 'دراسة', 'معرفة'],
-    health: ['صحة', 'نفسية', 'توازن', 'ضغوط', 'علاج', 'طبي'],
-    environment: ['بيئة', 'طبيعة', 'تلوث', 'مناخ', 'حماية', 'استدامة']
-  };
-  
-  // تحديد الموضوع الأساسي
-  let detectedTopic = 'general';
-  let maxMatches = 0;
-  
-  for (const [topic, keywords] of Object.entries(topicKeywords)) {
-    const matches = keywords.filter(keyword => cleanText.includes(keyword)).length;
-    if (matches > maxMatches) {
-      maxMatches = matches;
-      detectedTopic = topic;
-    }
-  }
-  
-  // إنتاج تلخيص حسب الموضوع المحدد والنص الفعلي
-  const summaryTemplates = {
-    technology: [
-      `💻 نقطة تقنية رقم ${chunkNumber}: تم مناقشة التطورات التكنولوجية والحلول الرقمية الحديثة`,
-      `🔧 تركيز تقني رقم ${chunkNumber}: شُرحت الأدوات والتقنيات المستخدمة في التطوير والبرمجة`,
-      `🚀 ابتكار تقني رقم ${chunkNumber}: تم التطرق للتقنيات الناشئة وتأثيرها على المستقبل`
-    ],
-    business: [
-      `📊 نقطة إدارية رقم ${chunkNumber}: تم تناول استراتيجيات الإدارة والتخطيط للمشاريع`,
-      `💼 محور أعمال رقم ${chunkNumber}: شُرحت طرق تطوير الأعمال وإدارة الفرق`,
-      `📈 رؤية تجارية رقم ${chunkNumber}: تم مناقشة النمو والتوسع في الأسواق`
-    ],
-    education: [
-      `📚 نقطة تعليمية رقم ${chunkNumber}: تم التركيز على طرق التعلم الحديثة وتطوير المهارات`,
-      `🎓 محور أكاديمي رقم ${chunkNumber}: شُرحت المناهج والأساليب التعليمية المبتكرة`,
-      `💡 فكرة تربوية رقم ${chunkNumber}: تم مناقشة تحسين بيئة التعلم والتحصيل`
-    ],
-    health: [
-      `🏥 نقطة صحية رقم ${chunkNumber}: تم التطرق لأهمية الصحة والعافية الجسدية والنفسية`,
-      `💚 محور علاجي رقم ${chunkNumber}: شُرحت طرق المحافظة على الصحة والوقاية`,
-      `🧠 رعاية نفسية رقم ${chunkNumber}: تم مناقشة إدارة الضغوط والتوازن النفسي`
-    ],
-    environment: [
-      `🌱 نقطة بيئية رقم ${chunkNumber}: تم التركيز على الاستدامة وحماية البيئة`,
-      `🌍 محور إيكولوجي رقم ${chunkNumber}: شُرحت التحديات البيئية والحلول الخضراء`,
-      `♻️ وعي بيئي رقم ${chunkNumber}: تم مناقشة المسؤولية البيئية والتغيير المناخي`
-    ]
-  };
-  
-  // اختيار تلخيص مناسب للموضوع
-  const topicSummaries = summaryTemplates[detectedTopic] || [
-    `📝 نقطة رقم ${chunkNumber}: تم تناول موضوع مهم وشرح النقاط الأساسية بوضوح`,
-    `🎯 تركيز رقم ${chunkNumber}: تم التطرق لمفاهيم أساسية وتطبيقات عملية مفيدة`,
-    `⭐ محور رقم ${chunkNumber}: شُرحت الأفكار الرئيسية مع أمثلة وتوضيحات واضحة`
-  ];
-  
-  // اختيار تلخيص عشوائي من الموضوع المحدد
-  const selectedSummary = topicSummaries[Math.floor(Math.random() * topicSummaries.length)];
-  
-  // إضافة تفاصيل من النص الأصلي إذا كان قصيراً بما فيه الكفاية
-  let enhancedSummary = selectedSummary;
-  if (text.length > 50 && text.length < 200) {
-    const keyPhrase = text.split(' ').slice(0, 8).join(' ');
-    enhancedSummary += ` - تم التطرق إلى: "${keyPhrase}..."`;
-  }
-  
-  return enhancedSummary;
-}
 
 // تقديم الملفات الثابتة من مجلد dist
 app.use(express.static(path.join(__dirname, 'dist')));
