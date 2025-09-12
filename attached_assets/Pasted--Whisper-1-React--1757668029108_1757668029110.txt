@@ -1,0 +1,103 @@
+📝 تعليمات للمطور — إضافة Whisper مع التسجيل من الميكروفون
+1. واجهة React (التسجيل من الميكروفون)
+
+أضف مكوّن AudioRecorder.jsx (أو عدّل الموجود).
+
+استخدم navigator.mediaDevices.getUserMedia لطلب إذن الميكروفون.
+
+خزّن الصوت كـ Blob ثم أرسله إلى السيرفر عبر fetch("/api/transcribe") باستخدام FormData.
+
+🔹 مثال مبسط:
+
+const formData = new FormData();
+formData.append("file", audioBlob, "recording.webm");
+
+const response = await fetch("/api/transcribe", {
+  method: "POST",
+  body: formData,
+});
+const data = await response.json();
+console.log("📋 النص المفرغ:", data.text);
+
+2. السيرفر (Node.js + Express)
+
+أضف مكتبات:
+
+npm install express multer cors
+
+
+عدّل/أضف في server.js:
+
+import express from "express";
+import multer from "multer";
+import cors from "cors";
+import fs from "fs";
+import { spawn } from "child_process";
+
+const app = express();
+app.use(cors());
+
+const upload = multer({ dest: "uploads/" });
+
+app.post("/api/transcribe", upload.single("file"), (req, res) => {
+  const filePath = req.file.path;
+
+  // استدعاء سكربت بايثون
+  const py = spawn("python3", ["transcribe.py", filePath]);
+
+  let result = "";
+  py.stdout.on("data", (data) => (result += data.toString()));
+
+  py.stderr.on("data", (data) => console.error("Whisper error:", data.toString()));
+
+  py.on("close", () => {
+    fs.unlinkSync(filePath); // تنظيف الملفات
+    res.json({ text: result.trim() });
+  });
+});
+
+app.listen(3001, () => console.log("🚀 Server running on http://localhost:3001"));
+
+3. سكربت Whisper (transcribe.py)
+
+أنشئ ملف transcribe.py بجانب server.js.
+
+الكود:
+
+import sys
+import whisper
+
+model = whisper.load_model("base")
+audio_path = sys.argv[1]
+
+result = model.transcribe(audio_path, language="ar")
+print(result["text"])
+
+4. التثبيت
+
+ثبّت مكتبة Whisper في بيئة البايثون:
+
+pip install openai-whisper
+
+
+(قد يحتاج أيضًا: pip install torch إذا لم يكن مثبتًا)
+
+5. التكامل مع "تلخيصلي"
+
+حالياً التطبيق يستخدم fallback (تفريغ بديل عند فشل OpenAI API).
+
+استبدل هذا fallback بالاستدعاء الجديد /api/transcribe حتى يعتمد على Whisper المحلي.
+
+عند نجاح التفريغ، مرر النص مباشرة لواجهة التلخيص /api/summarize كالمعتاد.
+
+6. ملاحظات مهمة
+
+استخدم .gitignore لمنع رفع الملفات الصوتية أو مفاتيح حساسة.
+
+إذا اشتغل Whisper محليًا فهذا سيوفر تكاليف OpenAI API.
+
+ممكن إضافة اختيار في الإعدادات:
+
+"تفريغ باستخدام OpenAI API"
+
+"تفريغ باستخدام Whisper المحلي"

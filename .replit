@@ -2,7 +2,7 @@
 audio = true
 
 run = "npm run dev"
-modules = ["nodejs-20", "web"]
+modules = ["nodejs-20", "web", "python-3.11"]
 hidden = [".config", "package-lock.json"]
 entrypoint = "index.html"
 
@@ -65,6 +65,10 @@ externalPort = 3000
 [[ports]]
 localPort = 33943
 externalPort = 8008
+
+[[ports]]
+localPort = 35123
+externalPort = 8099
 
 [[ports]]
 localPort = 40955

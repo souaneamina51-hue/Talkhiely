@@ -7,6 +7,8 @@ import multer from 'multer';
 import cors from 'cors';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import { spawn } from 'child_process';
 
 // تحميل متغيرات البيئة
 dotenv.config();
@@ -56,6 +58,14 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // إعداد multer لرفع الملفات الصوتية
 const upload = multer({
   storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50MB
+  }
+});
+
+// إعداد multer لحفظ الملفات مؤقتاً للـ local Whisper
+const uploadLocal = multer({
+  dest: "uploads/",
   limits: {
     fileSize: 50 * 1024 * 1024 // 50MB
   }
@@ -216,6 +226,83 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
     res.status(500).json({ 
       error: error.message || 'حدث خطأ في معالجة الملف الصوتي',
       code: error.code || 'TRANSCRIPTION_ERROR'
+    });
+  }
+});
+
+// 🔹 API للتفريغ النصي باستخدام Whisper المحلي
+app.post('/api/transcribe-local', uploadLocal.single('file'), (req, res) => {
+  try {
+    console.log('🔤 [Whisper المحلي] بدء معالجة طلب التفريغ المحلي:');
+    console.log('   - req.file موجود:', !!req.file);
+    console.log('   - req.body:', req.body);
+    
+    if (!req.file) {
+      console.error('❌ [Whisper المحلي] req.file غير موجود');
+      return res.status(400).json({ 
+        error: 'لم يتم رفع أي ملف',
+        code: 'NO_FILE'
+      });
+    }
+
+    const filePath = req.file.path;
+    console.log('📁 [Whisper المحلي] مسار الملف:', filePath);
+
+    // استدعاء سكربت Python
+    const py = spawn("python3", ["transcribe.py", filePath]);
+    
+    let result = "";
+    let errorOutput = "";
+
+    py.stdout.on("data", (data) => {
+      result += data.toString();
+    });
+
+    py.stderr.on("data", (data) => {
+      errorOutput += data.toString();
+      console.error("❌ [Whisper المحلي] خطأ:", data.toString());
+    });
+
+    py.on("close", (code) => {
+      // تنظيف الملف المؤقت
+      try {
+        fs.unlinkSync(filePath);
+      } catch (cleanupError) {
+        console.warn('⚠️ [Whisper المحلي] فشل في حذف الملف المؤقت:', cleanupError.message);
+      }
+
+      if (code !== 0) {
+        console.error(`❌ [Whisper المحلي] فشل السكربت برمز: ${code}`);
+        console.error('   رسالة الخطأ:', errorOutput);
+        
+        return res.status(500).json({ 
+          error: 'فشل في تفريغ الملف الصوتي باستخدام Whisper المحلي',
+          details: errorOutput,
+          code: 'LOCAL_WHISPER_ERROR'
+        });
+      }
+
+      const transcribedText = result.trim();
+      console.log('✅ [Whisper المحلي] تم التفريغ بنجاح:', transcribedText);
+
+      const response = {
+        text: transcribedText,
+        source: 'local-whisper',
+        file_info: {
+          name: req.file.originalname,
+          size: req.file.size,
+          type: req.file.mimetype
+        }
+      };
+
+      res.json(response);
+    });
+
+  } catch (error) {
+    console.error('❌ [Whisper المحلي] خطأ في التفريغ:', error);
+    res.status(500).json({ 
+      error: error.message || 'حدث خطأ في معالجة الملف الصوتي',
+      code: 'LOCAL_TRANSCRIPTION_ERROR'
     });
   }
 });
