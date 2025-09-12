@@ -121,119 +121,10 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// 🔹 نقطة تحقق 3: API للتفريغ النصي للمقاطع الصوتية باستخدام OpenAI Whisper
-app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
+// 🔹 نقطة تحقق 3: API للتفريغ النصي للمقاطع الصوتية باستخدام Whisper المحلي
+app.post('/api/transcribe', uploadLocal.single('file'), (req, res) => {
   try {
-    console.log('🔤 [نقطة تحقق 3] بدء معالجة طلب التفريغ:');
-    console.log('   - req.file موجود:', !!req.file);
-    console.log('   - req.body:', req.body);
-    
-    const { language } = req.body;
-    const audioBuffer = req.file?.buffer;
-    
-    // 🔹 نقطة تحقق 3أ: فحص الملف المرفوع
-    if (!req.file) {
-      console.error('❌ [نقطة تحقق 3أ] req.file غير موجود');
-      return res.status(400).json({ 
-        error: 'لم يتم رفع أي ملف',
-        received_fields: Object.keys(req.body),
-        file_info: null
-      });
-    }
-    
-    if (!audioBuffer) {
-      console.error('❌ [نقطة تحقق 3أ] audioBuffer غير موجود رغم وجود req.file');
-      return res.status(400).json({ 
-        error: 'الملف المرفوع لا يحتوي على بيانات',
-        file_info: {
-          fieldname: req.file.fieldname,
-          originalname: req.file.originalname,
-          mimetype: req.file.mimetype,
-          size: req.file.size
-        }
-      });
-    }
-
-    console.log(`✅ [نقطة تحقق 3أ] ملف صوتي صالح:`);
-    console.log(`   - الاسم: ${req.file.originalname}`);
-    console.log(`   - النوع: ${req.file.mimetype}`);
-    console.log(`   - الحجم: ${Math.round(audioBuffer.length / 1024)} KB`);
-    console.log(`   - اللغة المطلوبة: ${language || 'ar (افتراضي)'}`);
-
-    // 🔹 نقطة تحقق 3ب: فحص صيغة الملف
-    const supportedTypes = ['audio/webm', 'audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/m4a', 'audio/x-m4a'];
-    if (!supportedTypes.includes(req.file.mimetype)) {
-      console.warn(`⚠️ [نقطة تحقق 3ب] نوع ملف غير مدعوم: ${req.file.mimetype}`);
-      console.log(`   الأنواع المدعومة: ${supportedTypes.join(', ')}`);
-    }
-
-    // 🔹 نقطة تحقق 4: فحص OpenAI API
-    console.log('🔍 [نقطة تحقق 4] فحص OpenAI API:');
-    console.log('   - openai object موجود:', !!openai);
-    console.log('   - OPENAI_API_KEY موجود:', !!process.env.OPENAI_API_KEY);
-    
-    if (!openai || !process.env.OPENAI_API_KEY) {
-      console.error('❌ [نقطة تحقق 4] OpenAI API Key مفقود أو غير صحيح');
-      return res.status(500).json({ 
-        error: 'Missing or invalid OpenAI API Key. Please check your environment variables.',
-        code: 'MISSING_API_KEY'
-      });
-    }
-
-    // إنشاء ملف من البيانات
-    const file = new File([audioBuffer], req.file.originalname || 'audio.webm', { 
-      type: req.file.mimetype || 'audio/webm' 
-    });
-    
-    console.log('🤖 [نقطة تحقق 4] إرسال الصوت إلى OpenAI Whisper...');
-    console.log('   - اسم الملف:', file.name);
-    console.log('   - نوع الملف:', file.type);
-    console.log('   - حجم الملف:', Math.round(file.size / 1024), 'KB');
-    
-    // تفريغ الصوت باستخدام OpenAI Whisper
-    const transcription = await openai.audio.transcriptions.create({
-      file: file,
-      model: 'whisper-1',
-      language: language === 'ar-DZ' ? 'ar' : language || 'ar',
-      response_format: 'json',
-      temperature: 0.1
-    });
-
-    console.log('📥 [نقطة تحقق 4] استجابة OpenAI Whisper:', transcription);
-
-    const transcribedText = transcription.text;
-    console.log(`✅ [نقطة تحقق 4] تم التفريغ بنجاح من OpenAI:`);
-    console.log(`   النص: "${transcribedText}"`);
-
-    const result = {
-      text: transcribedText,
-      language: transcription.language || language || 'ar',
-      duration: transcription.duration || Math.round(audioBuffer.length / 16000),
-      confidence: 0.95,
-      source: 'openai-whisper',
-      file_info: {
-        name: req.file.originalname,
-        size: req.file.size,
-        type: req.file.mimetype
-      }
-    };
-
-    console.log('📤 [نقطة تحقق 4] إرجاع النتيجة:', result);
-    res.json(result);
-
-  } catch (error) {
-    console.error('❌ خطأ في التفريغ النصي:', error);
-    res.status(500).json({ 
-      error: error.message || 'حدث خطأ في معالجة الملف الصوتي',
-      code: error.code || 'TRANSCRIPTION_ERROR'
-    });
-  }
-});
-
-// 🔹 API للتفريغ النصي باستخدام Whisper المحلي
-app.post('/api/transcribe-local', uploadLocal.single('file'), (req, res) => {
-  try {
-    console.log('🔤 [Whisper المحلي] بدء معالجة طلب التفريغ المحلي:');
+    console.log('🔤 [Whisper المحلي] بدء معالجة طلب التفريغ:');
     console.log('   - req.file موجود:', !!req.file);
     console.log('   - req.body:', req.body);
     
@@ -248,7 +139,7 @@ app.post('/api/transcribe-local', uploadLocal.single('file'), (req, res) => {
     const filePath = req.file.path;
     console.log('📁 [Whisper المحلي] مسار الملف:', filePath);
 
-    // استدعاء سكربت Python
+    // استدعاء سكربت Python وتشغيل Whisper محلي
     const py = spawn("python3", ["transcribe.py", filePath]);
     
     let result = "";
@@ -264,7 +155,7 @@ app.post('/api/transcribe-local', uploadLocal.single('file'), (req, res) => {
     });
 
     py.on("close", (code) => {
-      // تنظيف الملف المؤقت
+      // تنظيف الملف بعد الاستخدام
       try {
         fs.unlinkSync(filePath);
       } catch (cleanupError) {

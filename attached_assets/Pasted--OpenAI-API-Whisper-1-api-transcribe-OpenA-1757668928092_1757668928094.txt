@@ -1,0 +1,90 @@
+🛠️ تعليمات للمطور: استبدال OpenAI API بـ Whisper محلي
+1. الهدف
+
+حالياً /api/transcribe يستعمل OpenAI API → يرجع خطأ (429 insufficient_quota).
+
+المطلوب: تعديل الكود ليستخدم Whisper محلي (بايثون) لمعالجة الصوت مباشرة داخل Replit.
+
+2. إعداد بيئة Replit
+
+في الـ Shell داخل Replit، ثبّت مكتبة Whisper:
+
+pip install openai-whisper torch
+
+
+تأكد أنّ بايثون مفعّل (Replit يسمح لك تستعمل Node + Python مع بعض).
+
+3. إنشاء سكربت Whisper محلي
+
+أنشئ ملف جديد باسم: transcribe.py
+
+الصق فيه الكود التالي:
+
+import sys
+import whisper
+
+# تحميل الموديل (base = خفيف وسريع)
+model = whisper.load_model("base")
+
+# استلام مسار الملف الصوتي من Node.js
+audio_path = sys.argv[1]
+
+# تنفيذ التفريغ باللغة العربية
+result = model.transcribe(audio_path, language="ar")
+
+# طباعة النص ليقرأه Node.js
+print(result["text"])
+
+4. تعديل السيرفر (server.js)
+
+استبدل الكود الخاص باستدعاء OpenAI API داخل /api/transcribe
+
+ضعه بهذا الشكل:
+
+import { spawn } from "child_process";
+import fs from "fs";
+import express from "express";
+import multer from "multer";
+
+const app = express();
+const upload = multer({ dest: "uploads/" });
+
+app.post("/api/transcribe", upload.single("file"), (req, res) => {
+  const filePath = req.file.path;
+
+  // استدعاء سكربت بايثون وتشغيل Whisper محلي
+  const py = spawn("python3", ["transcribe.py", filePath]);
+
+  let result = "";
+  py.stdout.on("data", (data) => {
+    result += data.toString();
+  });
+
+  py.stderr.on("data", (data) => {
+    console.error("Whisper error:", data.toString());
+  });
+
+  py.on("close", () => {
+    fs.unlinkSync(filePath); // تنظيف الملف بعد الاستخدام
+    res.json({ text: result.trim() });
+  });
+});
+
+// باقي إعدادات السيرفر (summarize وغيره)
+
+5. التحقق
+
+شغّل السيرفر:
+
+npm run server
+
+
+افتح التطبيق وسجّل بالصوت → لازم ترجع استجابة فيها النص المفرّغ من Whisper المحلي.
+
+6. ملاحظات هامة
+
+Whisper base سريع ويكفي كبداية. ممكن تغييره لـ "small" أو "medium" إذا أردت دقة أعلى.
+
+لازم السيرفر يبقى يشغّل بايثون بشكل صحيح (Replit يسمح بهذا).
+
+إذا الصوت طويل، Whisper قد يأخذ بعض الوقت → ممكن نضيف loader في الواجهة الأمامية.

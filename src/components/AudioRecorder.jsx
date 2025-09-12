@@ -9,9 +9,6 @@ import {
   Alert,
   AlertIcon,
   Progress,
-  Switch,
-  FormControl,
-  FormLabel,
   useColorModeValue
 } from '@chakra-ui/react';
 
@@ -21,7 +18,6 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
   const [processingChunks, setProcessingChunks] = useState(0);
   const [recordedChunks, setRecordedChunks] = useState(0);
   const [currentTranscript, setCurrentTranscript] = useState("");
-  const [useLocalWhisper, setUseLocalWhisper] = useState(false);
 
   // refs للتحكم في التسجيل والتقسيم
   const mediaRecorderRef = useRef(null);
@@ -229,26 +225,17 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
 
   const transcribeAudioChunk = async (audioBlob, chunkNumber) => {
     try {
-      const transcriptionMethod = useLocalWhisper ? 'Whisper المحلي' : 'OpenAI API';
-      console.log(`🔤 [نقطة تحقق 6أ] بدء تفريغ المقطع رقم ${chunkNumber} باستخدام ${transcriptionMethod}:`);
+      console.log(`🔤 [نقطة تحقق 6أ] بدء تفريغ المقطع رقم ${chunkNumber} باستخدام Whisper المحلي:`);
       console.log(`   - حجم البيانات: ${Math.round(audioBlob.size / 1024)} KB`);
       console.log(`   - نوع البيانات: ${audioBlob.type}`);
 
       // إعداد البيانات للإرسال
       const formData = new FormData();
-      
-      // تحديد نوع الملف ونقطة النهاية حسب النوع المختار
-      if (useLocalWhisper) {
-        formData.append('file', audioBlob, `chunk_${chunkNumber}.webm`);
-        console.log(`📤 [نقطة تحقق 6أ] إرسال الطلب إلى /api/transcribe-local...`);
-      } else {
-        formData.append('audio', audioBlob, `chunk_${chunkNumber}.webm`);
-        formData.append('language', 'ar-DZ');
-        console.log(`📤 [نقطة تحقق 6أ] إرسال الطلب إلى /api/transcribe...`);
-      }
+      formData.append('file', audioBlob, `chunk_${chunkNumber}.webm`);
 
-      const endpoint = useLocalWhisper ? '/api/transcribe-local' : '/api/transcribe';
-      const response = await fetch(endpoint, {
+      console.log(`📤 [نقطة تحقق 6أ] إرسال الطلب إلى /api/transcribe...`);
+
+      const response = await fetch('/api/transcribe', {
         method: 'POST',
         body: formData
       });
@@ -500,32 +487,14 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
           {formatTime(timer)}
         </Text>
 
-        {/* Transcription Method Selection */}
-        <FormControl display="flex" alignItems="center" justifyContent="center">
-          <FormLabel htmlFor="whisper-toggle" mb="0" fontSize="sm" color="gray.600">
-            تفريغ باستخدام OpenAI API
-          </FormLabel>
-          <Switch
-            id="whisper-toggle"
-            isChecked={useLocalWhisper}
-            onChange={(e) => setUseLocalWhisper(e.target.checked)}
-            isDisabled={isRecording}
-            colorScheme="green"
-            mx={2}
-          />
-          <FormLabel htmlFor="whisper-toggle" mb="0" fontSize="sm" color="gray.600">
-            تفريغ باستخدام Whisper المحلي
-          </FormLabel>
-        </FormControl>
-
         {/* Status Badge */}
         <Badge
-          colorScheme={useLocalWhisper ? "green" : "blue"}
+          colorScheme="green"
           fontSize="xs"
           px={2}
           py={1}
         >
-          {useLocalWhisper ? "🔧 Whisper المحلي" : "🌐 OpenAI API"}
+          🔧 Whisper المحلي
         </Badge>
 
         {/* Control Buttons */}
