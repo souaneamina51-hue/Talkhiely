@@ -17,6 +17,7 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
   const [timer, setTimer] = useState(0);
   const [processingChunks, setProcessingChunks] = useState(0);
   const [recordedChunks, setRecordedChunks] = useState(0);
+  const [currentTranscript, setCurrentTranscript] = useState("");
 
   // refs للتحكم في التسجيل والتقسيم
   const mediaRecorderRef = useRef(null);
@@ -116,6 +117,7 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
       setTimer(0);
       setRecordedChunks(0);
       setProcessingChunks(0);
+      setCurrentTranscript(""); // مسح النص السابق
 
       // إخبار المكون الأب بتغيير حالة التسجيل
       if (onRecordingStateChange) {
@@ -268,6 +270,9 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
       } else if (result.source === 'fallback') {
         console.log(`⚠️ [نقطة تحقق 6أ] تم تفريغ المقطع ${chunkNumber} بواسطة النظام الاحتياطي`);
       }
+
+      // عرض النص في الواجهة
+      setCurrentTranscript(result.text);
 
       return result.text;
 
@@ -494,6 +499,40 @@ const AudioRecorder = ({ onNewSummary, onRecordingStateChange, trialStatus }) =>
             {isRecording ? "⏹️ إيقاف التسجيل" : "🎙️ بدء التسجيل"}
           </Button>
         </HStack>
+
+        {/* عرض النص المفرغ الحالي */}
+        {currentTranscript && (
+          <Box mt={4} p={4} bg="gray.50" borderRadius="md" w="full">
+            <Text fontSize="sm" fontWeight="bold" color="gray.600" mb={2}>
+              📝 النص المفرغ الحالي:
+            </Text>
+            <Text fontSize="sm" color="gray.800">
+              {currentTranscript}
+            </Text>
+          </Box>
+        )}
+
+        {/* معلومات الحالة */}
+        {isRecording && (
+          <VStack spacing={2} w="full">
+            <HStack justify="space-between" w="full">
+              <Text fontSize="sm" color="gray.600">
+                مقاطع مسجلة: {recordedChunks}
+              </Text>
+              <Text fontSize="sm" color="gray.600">
+                قيد المعالجة: {processingChunks}
+              </Text>
+            </HStack>
+            {processingChunks > 0 && (
+              <Progress
+                value={(processingChunks / Math.max(recordedChunks, 1)) * 100}
+                size="sm"
+                colorScheme="blue"
+                w="full"
+              />
+            )}
+          </VStack>
+        )}
 
         </VStack>
     </Box>
